@@ -196,6 +196,23 @@
         
         .custom-method-item { background: #f8fafc; border: 1px dashed #cbd5e1; border-radius: 16px; padding: 20px; margin-bottom: 15px; }
 
+        .request-card {
+            background:#f8fafc; border:1px solid #e2e8f0; border-radius:16px; padding:16px;
+            display:flex; align-items:center; justify-content:space-between; gap:14px; margin-bottom:12px;
+        }
+        .request-card-main { flex:1; min-width:0; }
+        .request-game-name { font-size:1rem; font-weight:800; color:#0f172a; word-break:break-word; }
+        .request-date { margin-top:5px; font-size:.78rem; color:#64748b; }
+        .request-empty { text-align:center; color:#94a3b8; padding:25px 10px; }
+        #gameRequestsList { display:flex; flex-direction:column; width:100%; max-height:none !important; height:auto !important; overflow:visible !important; }
+        #gameRequestsList .request-card { flex:0 0 auto; width:100%; box-sizing:border-box; }
+        .request-number { min-width:32px; height:32px; border-radius:10px; background:rgba(14,165,233,.10); color:var(--primary); display:flex; align-items:center; justify-content:center; font-weight:900; }
+        .request-delete-btn { width:42px; height:42px; border:1px solid rgba(239,68,68,.18); border-radius:12px; background:rgba(239,68,68,.07); color:#ef4444; cursor:pointer; display:flex; align-items:center; justify-content:center; flex:0 0 auto; transition:.2s ease; }
+        .request-delete-btn:hover { background:#ef4444; color:#fff; transform:translateY(-1px); box-shadow:0 8px 18px rgba(239,68,68,.18); }
+        .request-game-name i { color:var(--primary); margin-left:8px; }
+        .request-date i { margin-left:5px; }
+        @media(max-width:768px){ .request-card{align-items:flex-start;flex-direction:column;} .request-card .btn-group{width:100%;} }
+
         /* تعديلات الهاتف المحمول - تصميم تطبيق عصري */
         @media (max-width: 768px) {
             .admin-nav {
@@ -274,6 +291,7 @@
     <div class="admin-nav">
         <button class="tab-btn active" onclick="openTab('tab-general', this)"><i class="fas fa-cog"></i> الإعدادات</button>
         <button class="tab-btn" onclick="openTab('tab-games', this)"><i class="fas fa-gamepad"></i> المنتجات</button>
+        <button class="tab-btn" onclick="openTab('tab-requests', this)"><i class="fas fa-comments"></i> طلبات الألعاب</button>
         <button class="tab-btn" onclick="openTab('tab-discounts', this)" style="color:#f59e0b;"><i class="fas fa-bolt"></i> الخصومات</button>
     </div>
 
@@ -424,7 +442,35 @@
             <div id="gamesList"></div>
         </div>
 
-        <!-- التبويب 3: الخصومات العشوائية -->
+        <!-- التبويب 3: طلبات الألعاب والأسئلة -->
+        <div id="tab-requests" class="tab-content">
+            <h2>طلبات الألعاب <i class="fas fa-comments" style="color:var(--primary);"></i></h2>
+
+            <div class="form-section" style="border-top:4px solid var(--primary);">
+                <div class="row">
+                    <div style="flex:2;">
+                        <label class="toggle-line">
+                            <input type="checkbox" id="gameRequestEnabled" checked>
+                            <span>إظهار نافذة طلب اسم اللعبة في الموقع الرئيسي</span>
+                        </label>
+                        <p style="font-size:.82rem;color:var(--text-light);margin:8px 0 0;line-height:1.7;">عند التشغيل يظهر للمستخدم مربع أنيق لكتابة اسم اللعبة التي يريد إضافتها. عند الإيقاف لن تظهر النافذة نهائياً للمستخدم.</p>
+                    </div>
+                    <div>
+                        <button class="action-btn" id="saveGameRequestSettingsBtn" onclick="saveGameRequestSettings()"><i class="fas fa-save"></i> حفظ حالة النافذة</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-section">
+                <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+                    <h3 style="margin:0;"><i class="fas fa-list"></i> الألعاب التي طلبها الزوار</h3>
+                    <button class="btn-small btn-red" type="button" onclick="clearGameRequests()"><i class="fas fa-trash"></i> حذف الطلبات كلها</button>
+                </div>
+                <div id="gameRequestsList" style="margin-top:18px;"></div>
+            </div>
+        </div>
+
+        <!-- التبويب 4: الخصومات العشوائية -->
         <div id="tab-discounts" class="tab-content">
             
             <div class="verify-box">
@@ -584,138 +630,799 @@
             try { await auth.signOut(); } catch (e) { console.error(e); }
         }
 
-        auth.onAuthStateChanged(user => {
-            if (user && (user.email || '').toLowerCase() === AUTHORIZED_EMAIL.toLowerCase()) {
-                showAdminApp(user);
-            } else {
-                if (user) auth.signOut();
-                hideAdminApp();
-            }
-        });
 
+
+
+        // ================== حماية وثبات لوحة التحكم ==================
+        // ملاحظة مهمة: لا يتم استخدام set() على أي مسار أب أعلى من العنصر المراد تعديله.
+        // جميع التعديلات تتم على نفس المسارات القديمة حتى لا يتم حذف الإعدادات الأخرى.
         let globalGames = {};
         let editingGameId = null;
-
-        function compressAndEncodeImage(file, maxWidth = 800) {
-            return new Promise((resolve, reject) => {
-                const reader = new FileReader();
-                reader.readAsDataURL(file);
-                reader.onload = event => {
-                    const img = new Image();
-                    img.src = event.target.result;
-                    img.onload = () => {
-                        const canvas = document.createElement('canvas');
-                        const ctx = canvas.getContext('2d');
-                        let width = img.width;
-                        let height = img.height;
-                        if (width > maxWidth) {
-                            height = Math.round((height *= maxWidth / width));
-                            width = maxWidth;
-                        }
-                        canvas.width = width;
-                        canvas.height = height;
-                        ctx.drawImage(img, 0, 0, width, height);
-                        resolve(canvas.toDataURL('image/jpeg', 0.8));
-                    };
-                    img.onerror = error => reject(error);
-                };
-                reader.onerror = error => reject(error);
-            });
-        }
+        let dataListenersStarted = false;
+        const activeDbListeners = [];
 
         function openTab(tabId, btn) {
             document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
             document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
-            document.getElementById(tabId).classList.add('active');
-            event.currentTarget.classList.add('active');
-            window.scrollTo({top:0, behavior: 'smooth'});
+            const tab = document.getElementById(tabId);
+            if (tab) tab.classList.add('active');
+            if (btn) btn.classList.add('active');
+            window.scrollTo({top:0, behavior:'smooth'});
         }
 
-        db.ref('settings/general/logo').on('value', snap => {
-            const val = snap.val() || '';
-            document.getElementById('logoUrl').value = (val.length > 200) ? '' : val;
-        });
-        
-        async function handleSaveLogo() {
-            const fileInput = document.getElementById('logoFile');
-            const urlInput = document.getElementById('logoUrl').value;
-            const btn = document.getElementById('saveLogoBtn');
-            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> جاري الحفظ...';
-            
-            try {
-                if (fileInput.files.length > 0) {
-                    const base64Img = await compressAndEncodeImage(fileInput.files[0]);
-                    await db.ref('settings/general/logo').set(base64Img);
-                    fileInput.value = '';
-                } else if (urlInput) {
-                    await db.ref('settings/general/logo').set(urlInput);
-                }
-                alert("تم حفظ اللوجو بنجاح!");
-            } catch (e) { alert("حدث خطأ!"); }
-            btn.innerHTML = '<i class="fas fa-save"></i> حفظ';
-        }
-
-        db.ref('settings/banners').on('value', snap => {
-            let html = ''; 
-            snap.forEach(c => {
-                let url = c.val();
-                let displayUrl = (url.length > 100) ? 'صورة مرفوعة من المعرض' : url;
-                html += `<div class="admin-card">
-                            <img src="${url}" style="height:60px; max-width:140px; object-fit:cover; border-radius:10px; background:#000; border:1px solid #cbd5e1;" onerror="this.src='https://via.placeholder.com/140x60?text=خطأ'">
-                            <div style="flex:1; margin:0 15px; font-size:0.85rem; color:var(--text-light); word-break: break-all; direction:ltr; text-align:left;">${displayUrl}</div>
-                            <button class="btn-small btn-red" onclick="if(confirm('هل أنت متأكد من حذف هذا الحدث؟')) db.ref('settings/banners/${c.key}').remove()"><i class="fas fa-trash"></i> حذف</button>
-                         </div>`;
+        function compressAndEncodeImage(file, maxWidth = 800) {
+            return new Promise((resolve, reject) => {
+                if (!file) return reject(new Error('لم يتم اختيار صورة'));
+                if (!file.type || !file.type.startsWith('image/')) return reject(new Error('الملف المختار ليس صورة.'));
+                const reader = new FileReader();
+                reader.onload = event => {
+                    const img = new Image();
+                    img.onload = () => {
+                        const canvas = document.createElement('canvas');
+                        const ctx = canvas.getContext('2d', { alpha: true });
+                        let width = img.width || maxWidth;
+                        let height = img.height || maxWidth;
+                        if (width > maxWidth) {
+                            height = Math.round(height * maxWidth / width);
+                            width = maxWidth;
+                        }
+                        canvas.width = width; canvas.height = height;
+                        ctx.drawImage(img, 0, 0, width, height);
+                        // جودة أخف حتى لا تتحول صور الإعدادات إلى بيانات ضخمة داخل RTDB.
+                        let result = canvas.toDataURL('image/jpeg', 0.68);
+                        // نمنع حفظ صورة ضخمة قد تؤدي إلى بطء/فشل الكتابة، ولا نلمس أي بيانات قديمة.
+                        if (result.length > 1400000) {
+                            result = canvas.toDataURL('image/jpeg', 0.52);
+                        }
+                        if (result.length > 1800000) {
+                            reject(new Error('الصورة كبيرة جداً بعد الضغط. اختر صورة أصغر أو استخدم رابط صورة مباشر.'));
+                            return;
+                        }
+                        resolve(result);
+                    };
+                    img.onerror = () => reject(new Error('تعذر قراءة الصورة'));
+                    img.src = event.target.result;
+                };
+                reader.onerror = () => reject(new Error('تعذر قراءة الملف'));
+                reader.readAsDataURL(file);
             });
-            document.getElementById('bannersList').innerHTML = html || '<div class="admin-card" style="justify-content:center; color:#94a3b8;">لا توجد صور أحداث مضافة.</div>';
-        });
-
-        async function handleAddBanner() {
-            const fileInput = document.getElementById('newBannerFile');
-            const urlInput = document.getElementById('newBannerUrl').value;
-            const btn = document.getElementById('addBannerBtn');
-            if (!fileInput.files.length && !urlInput) return alert("يرجى إدخال رابط أو اختيار صورة من المعرض");
-            
-            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> جاري الرفع...';
-            try {
-                if (fileInput.files.length > 0) {
-                    const base64Img = await compressAndEncodeImage(fileInput.files[0]);
-                    await db.ref('settings/banners').push(base64Img);
-                    fileInput.value = '';
-                } else if (urlInput) {
-                    await db.ref('settings/banners').push(urlInput);
-                    document.getElementById('newBannerUrl').value = '';
-                }
-            } catch (e) { alert("حدث خطأ!"); }
-            btn.innerHTML = '<i class="fas fa-plus"></i> إضافة';
         }
 
-        // ================== إدارة إشعار الدخول المنبثق ==================
-        function updateWelcomePopupPreview(url) {
-            document.getElementById('welcomePopupPreviewImg').src =
-                url || 'https://via.placeholder.com/120x120?text=Preview';
+        function isAdminReady() {
+            return !!auth.currentUser &&
+                   (auth.currentUser.email || '').toLowerCase() === AUTHORIZED_EMAIL.toLowerCase();
         }
 
-        db.ref('settings/welcomePopup').on('value', snap => {
-            const enabled = document.getElementById('welcomePopupEnabled');
-            const duration = document.getElementById('welcomePopupDuration');
-            const imageUrl = document.getElementById('welcomePopupImageUrl');
-            const link = document.getElementById('welcomePopupLink');
+        function dbErrorMessage(error) {
+            console.error('Firebase:', error);
+            if (error && error.code === 'PERMISSION_DENIED') return 'ليس لديك صلاحية للوصول إلى البيانات.';
+            if (error && error.message) return error.message;
+            return 'حدث خطأ في الاتصال بقاعدة البيانات.';
+        }
 
-            if (!snap.exists()) {
-                enabled.checked = true;
-                duration.value = 10;
-                imageUrl.value = '';
-                link.value = '';
-                updateWelcomePopupPreview('');
+        function safeListener(ref, onValue, onError) {
+            const listener = ref.on('value', onValue, error => {
+                console.error('Realtime listener error:', error);
+                if (typeof onError === 'function') onError(error);
+            });
+            activeDbListeners.push({ref, listener});
+            return listener;
+        }
+
+        function stopDataListeners() {
+            while (activeDbListeners.length) {
+                const item = activeDbListeners.pop();
+                try { item.ref.off(item.event || 'value', item.listener); } catch (e) {}
+            }
+            dataListenersStarted = false;
+        }
+
+        function renderBanners(snap) {
+            const list = document.getElementById('bannersList');
+            if (!list || !snap.exists()) {
+                if (list) list.innerHTML = '<div class="admin-card" style="justify-content:center;color:#94a3b8;">لا توجد صور أحداث مضافة.</div>';
                 return;
             }
 
-            const data = snap.val() || {};
-            enabled.checked = data.enabled !== false;
-            duration.value = Math.max(1, parseInt(data.duration, 10) || 10);
-            imageUrl.value = (data.image && data.image.length < 200) ? data.image : '';
-            link.value = data.link || '';
-            updateWelcomePopupPreview(data.image || '');
+            let html = '';
+            snap.forEach(c => {
+                const url = typeof c.val() === 'string' ? c.val() : '';
+                if (!url) return;
+                const safeUrl = String(url).replace(/"/g, '&quot;');
+                const displayUrl = url.length > 100 ? 'صورة مرفوعة من المعرض' : url.replace(/</g,'&lt;').replace(/>/g,'&gt;');
+                html += `<div class="admin-card">
+                    <img src="${safeUrl}" style="height:60px;max-width:140px;object-fit:cover;border-radius:10px;background:#000;border:1px solid #cbd5e1;" onerror="this.src='https://via.placeholder.com/140x60?text=خطأ'">
+                    <div style="flex:1;margin:0 15px;font-size:.85rem;color:var(--text-light);word-break:break-all;direction:ltr;text-align:left;">${displayUrl}</div>
+                    <button class="btn-small btn-red" type="button" onclick="deleteBanner('${c.key}')"><i class="fas fa-trash"></i> حذف</button>
+                </div>`;
+            });
+            list.innerHTML = html || '<div class="admin-card" style="justify-content:center;color:#94a3b8;">لا توجد صور أحداث مضافة.</div>';
+        }
+
+        async function deleteBanner(key) {
+            if (!key || !confirm('هل أنت متأكد من حذف هذا الحدث؟')) return;
+            if (!isAdminReady()) return alert('يجب تسجيل الدخول أولاً.');
+            try {
+                await db.ref('settings/banners/' + key).remove();
+            } catch (e) {
+                alert('تعذر حذف الصورة: ' + dbErrorMessage(e));
+            }
+        }
+
+        async function handleSaveLogo() {
+            const fileInput = document.getElementById('logoFile');
+            const urlInput = document.getElementById('logoUrl').value.trim();
+            const btn = document.getElementById('saveLogoBtn');
+            if (!isAdminReady()) return alert('يجب تسجيل الدخول أولاً.');
+            if (!fileInput.files.length && !urlInput) return alert('ضع رابط اللوجو أو اختر صورة.');
+
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> جاري الحفظ...';
+            try {
+                let value = urlInput;
+                if (fileInput.files.length) value = await compressAndEncodeImage(fileInput.files[0], 900);
+
+                // تعديل العنصر نفسه فقط — لا يتم لمس settings/general أو settings بالكامل.
+                await writeAndVerify(db.ref('settings/general/logo'), value);
+                fileInput.value = '';
+                document.getElementById('logoUrl').value = value.length > 200 ? '' : value;
+                alert('تم حفظ اللوجو بنجاح.');
+            } catch (e) {
+                alert('حدث خطأ أثناء حفظ اللوجو: ' + dbErrorMessage(e));
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-save"></i> حفظ';
+            }
+        }
+
+        async function handleAddBanner() {
+            const fileInput = document.getElementById('newBannerFile');
+            const urlInput = document.getElementById('newBannerUrl').value.trim();
+            const btn = document.getElementById('addBannerBtn');
+            if (!isAdminReady()) return alert('يجب تسجيل الدخول أولاً.');
+            if (!fileInput.files.length && !urlInput) return alert('يرجى إدخال رابط أو اختيار صورة من المعرض');
+
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> جاري الحفظ...';
+            try {
+                let value = urlInput;
+                if (fileInput.files.length) value = await compressAndEncodeImage(fileInput.files[0], 1000);
+                const newBannerRef = db.ref('settings/banners').push();
+                await newBannerRef.set(value);
+                const bannerCheck = await newBannerRef.once('value');
+                if (!bannerCheck.exists() || bannerCheck.val() !== value) throw new Error('لم يتم تأكيد حفظ صورة السلايدر.');
+                fileInput.value = '';
+                document.getElementById('newBannerUrl').value = '';
+            } catch (e) {
+                alert('حدث خطأ أثناء حفظ الصورة: ' + dbErrorMessage(e));
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-plus"></i> إضافة';
+            }
+        }
+
+        function updateWelcomePopupPreview(url) {
+            const img = document.getElementById('welcomePopupPreviewImg');
+            if (img) img.src = url || 'https://via.placeholder.com/120x120?text=Preview';
+        }
+
+        async function saveWelcomePopup() {
+            if (!isAdminReady()) return alert('يجب تسجيل الدخول أولاً.');
+
+            const btn = document.getElementById('saveWelcomePopupBtn');
+            const fileInput = document.getElementById('welcomePopupImageFile');
+            const urlInput = document.getElementById('welcomePopupImageUrl').value.trim();
+            const enabled = document.getElementById('welcomePopupEnabled').checked;
+            const duration = Math.max(1, Math.min(300,
+                parseInt(document.getElementById('welcomePopupDuration').value, 10) || 10
+            ));
+            const link = document.getElementById('welcomePopupLink').value.trim();
+
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> جاري الحفظ...';
+
+            try {
+                let image = urlInput;
+
+                // إذا لم يتم اختيار صورة جديدة، نقرأ الصورة القديمة من نفس الحقل فقط.
+                if (fileInput.files.length) {
+                    image = await compressAndEncodeImage(fileInput.files[0], 1000);
+                } else if (!image) {
+                    const current = await db.ref('settings/welcomePopup/image').once('value');
+                    image = current.exists() ? (current.val() || '') : '';
+                }
+
+                // update على نفس العقدة، فلا يحذف أي حقول أخرى داخل settings.
+                const welcomeRef = db.ref('settings/welcomePopup');
+                await welcomeRef.update({ enabled, image, duration, link });
+                const welcomeCheck = await welcomeRef.once('value');
+                const savedWelcome = welcomeCheck.val() || {};
+                if (savedWelcome.enabled !== enabled || String(savedWelcome.image || '') !== String(image || '') || Number(savedWelcome.duration || 0) !== Number(duration) || String(savedWelcome.link || '') !== String(link || '')) {
+                    throw new Error('لم يتم تأكيد حفظ إعدادات الإشعار.');
+                }
+
+                if (fileInput.files.length) fileInput.value = '';
+                updateWelcomePopupPreview(image);
+                alert('تم حفظ إعدادات إشعار الدخول بنجاح.');
+            } catch (e) {
+                alert('حدث خطأ أثناء حفظ الإشعار: ' + dbErrorMessage(e));
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-save"></i> حفظ إعدادات الإشعار';
+            }
+        }
+
+        async function disableWelcomePopup() {
+            if (!isAdminReady()) return alert('يجب تسجيل الدخول أولاً.');
+            try {
+                await db.ref('settings/welcomePopup/enabled').set(false);
+                alert('تم إيقاف إشعار الدخول.');
+            } catch (e) {
+                alert('تعذر إيقاف الإشعار: ' + dbErrorMessage(e));
+            }
+        }
+
+        const iconsMap = {
+            whatsapp:'fab fa-whatsapp', facebook:'fab fa-facebook-f',
+            telegram:'fab fa-telegram-plane', instagram:'fab fa-instagram',
+            youtube:'fab fa-youtube', warranty:'fas fa-star'
+        };
+
+        function renderSocials(snap) {
+            const list = document.getElementById('socialsList');
+            if (!list) return;
+            let html = '';
+            if (snap.exists()) {
+                snap.forEach(c => {
+                    const s = c.val() || {};
+                    const iconClass = iconsMap[s.platform] || 'fas fa-link';
+                    const name = String(s.name || '').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+                    const url = String(s.url || '').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+                    html += `<div class="admin-card">
+                        <div style="display:flex;align-items:center;gap:15px;min-width:150px;">
+                            <div style="background:rgba(14,165,233,.1);width:45px;height:45px;display:flex;align-items:center;justify-content:center;border-radius:12px;color:var(--primary);font-size:1.3rem;"><i class="${iconClass}"></i></div>
+                            <strong style="font-size:1.1rem;">${name}</strong>
+                        </div>
+                        <div style="flex:1;font-size:.85rem;color:var(--text-light);direction:ltr;text-align:left;word-break:break-all;">${url}</div>
+                        <button class="btn-small btn-red" type="button" onclick="deleteSocial('${c.key}')"><i class="fas fa-trash"></i></button>
+                    </div>`;
+                });
+            }
+            list.innerHTML = html || '<div class="admin-card" style="justify-content:center;color:#94a3b8;">لا توجد أزرار مضافة.</div>';
+        }
+
+        async function deleteSocial(key) {
+            if (!key || !confirm('حذف هذا الزر؟')) return;
+            if (!isAdminReady()) return alert('يجب تسجيل الدخول أولاً.');
+            try { await db.ref('settings/socials/' + key).remove(); }
+            catch (e) { alert('تعذر الحذف: ' + dbErrorMessage(e)); }
+        }
+
+        async function addSocial() {
+            if (!isAdminReady()) return alert('يجب تسجيل الدخول أولاً.');
+            const p = document.getElementById('socialPlatform').value;
+            const n = document.getElementById('socialName').value.trim();
+            const u = document.getElementById('socialUrl').value.trim();
+            if (!n || !u) return alert('اكتب اسم الزر والرابط.');
+
+            try {
+                await db.ref('settings/socials').push({platform:p,name:n,url:u});
+                document.getElementById('socialName').value = '';
+                document.getElementById('socialUrl').value = '';
+            } catch (e) {
+                alert('تعذر إضافة الزر: ' + dbErrorMessage(e));
+            }
+        }
+
+        function renderGames(snap) {
+            globalGames = snap.exists() ? (snap.val() || {}) : {};
+            let html = '', selectHtml = '';
+            const arr = Object.keys(globalGames)
+                .map(k => ({key:k, ...(globalGames[k] || {})}))
+                .sort((a,b)=>(a.order || 99) - (b.order || 99));
+
+            arr.forEach(g => {
+                const img = String(g.img || '').replace(/"/g,'&quot;');
+                const name = String(g.name || '').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+                html += `<div class="admin-card">
+                    <div style="display:flex;align-items:center;gap:15px;">
+                        <img src="${img}" width="50" height="50" style="border-radius:12px;object-fit:cover;border:1px solid #e2e8f0;">
+                        <strong style="font-size:1.1rem;">${name}</strong>
+                    </div>
+                    <div class="btn-group">
+                        <button class="btn-small btn-yellow" type="button" onclick="editGame('${g.key}')"><i class="fas fa-pen"></i> تعديل</button>
+                        <button class="btn-small btn-red" type="button" onclick="deleteGame('${g.key}')"><i class="fas fa-trash"></i></button>
+                    </div>
+                </div>`;
+                selectHtml += `<option value="${name.replace(/"/g,'&quot;')}">${name}</option>`;
+            });
+
+            document.getElementById('gamesList').innerHTML = html || '<div class="admin-card" style="justify-content:center;color:#94a3b8;">لا توجد منتجات مضافة.</div>';
+            document.getElementById('discGameSelect').innerHTML = selectHtml || '<option value="">لا توجد منتجات</option>';
+        }
+
+        async function deleteGame(id) {
+            if (!id || !confirm('متأكد من الحذف؟')) return;
+            if (!isAdminReady()) return alert('يجب تسجيل الدخول أولاً.');
+            try { await db.ref('games/' + id).remove(); }
+            catch (e) { alert('تعذر حذف المنتج: ' + dbErrorMessage(e)); }
+        }
+
+        function addCustomMethodUI(name = '', prices = '', pricesUsd = '') {
+            const container = document.getElementById('customMethodsContainer');
+            const div = document.createElement('div');
+            div.className = 'custom-method-item';
+
+            const title = String(name).replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+            const egp = String(prices).replace(/</g,'&lt;').replace(/>/g,'&gt;');
+            const usd = String(pricesUsd).replace(/</g,'&lt;').replace(/>/g,'&gt;');
+
+            div.innerHTML = `
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px;">
+                    <label style="margin:0;font-size:1.1rem;color:var(--primary);">إعدادات الطريقة</label>
+                    <button class="btn-small btn-red" type="button" onclick="this.parentElement.parentElement.remove()"><i class="fas fa-trash"></i> حذف</button>
+                </div>
+                <input type="text" class="cm-name" placeholder="اسم الطريقة (مثل: عن طريق رقم الموبايل)" value="${title}" style="margin-bottom:15px;">
+                <div class="row">
+                    <div><label>الأسعار (بالمصري):</label><textarea class="cm-prices" placeholder="مثال: باقة فليكس = 50 ج">${egp}</textarea></div>
+                    <div><label>الأسعار (بالدولار):</label><textarea class="cm-prices-usd">${usd}</textarea></div>
+                </div>`;
+            container.appendChild(div);
+        }
+
+        async function handleSaveGame() {
+            if (!isAdminReady()) return alert('يجب تسجيل الدخول أولاً.');
+            const name = document.getElementById('gName').value.trim();
+            if (!name) return alert('الاسم مطلوب');
+
+            const btn = document.getElementById('saveGameBtn');
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> جاري الحفظ...';
+
+            try {
+                const fileInput = document.getElementById('gImgFile');
+                let finalImgUrl = document.getElementById('gImg').value.trim();
+
+                if (fileInput.files.length) {
+                    finalImgUrl = await compressAndEncodeImage(fileInput.files[0]);
+                } else if (!finalImgUrl && editingGameId && globalGames[editingGameId]) {
+                    finalImgUrl = globalGames[editingGameId].img || '';
+                }
+
+                const custom_methods = [];
+                document.querySelectorAll('.custom-method-item').forEach(item => {
+                    const mName = item.querySelector('.cm-name').value.trim();
+                    if (mName) custom_methods.push({
+                        name:mName,
+                        prices:item.querySelector('.cm-prices').value,
+                        prices_usd:item.querySelector('.cm-prices-usd').value
+                    });
+                });
+
+                const newData = {
+                    name,
+                    img:finalImgUrl,
+                    order:parseInt(document.getElementById('gOrder').value,10) || 99,
+                    id_available:document.getElementById('gIdAvail').checked,
+                    account_available:document.getElementById('gAccAvail').checked,
+                    id_prices:document.getElementById('gIdPrices').value,
+                    account_prices:document.getElementById('gAccPrices').value,
+                    id_prices_usd:document.getElementById('gIdPricesUsd').value,
+                    account_prices_usd:document.getElementById('gAccPricesUsd').value,
+                    custom_methods
+                };
+
+                if (editingGameId) {
+                    // update يحافظ على أي حقول قديمة غير موجودة في الواجهة.
+                    await db.ref('games/' + editingGameId).update(newData);
+                } else {
+                    await db.ref('games').push(newData);
+                }
+
+                alert('تم الحفظ بنجاح بدون حذف البيانات الأخرى.');
+                cancelEdit();
+            } catch (e) {
+                alert('حدث خطأ أثناء الحفظ: ' + dbErrorMessage(e));
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-cloud-upload-alt"></i> حفظ المنتج في السيستم';
+            }
+        }
+
+        function editGame(id) {
+            if (!globalGames[id]) return alert('المنتج غير موجود أو تم حذفه.');
+            editingGameId = id;
+            const g = globalGames[id];
+
+            document.getElementById('gName').value = g.name || '';
+            document.getElementById('gImg').value = (g.img && g.img.length > 200) ? '' : (g.img || '');
+            document.getElementById('gOrder').value = g.order || 99;
+            document.getElementById('gIdAvail').checked = !!g.id_available;
+            document.getElementById('gAccAvail').checked = !!g.account_available;
+            document.getElementById('gIdPrices').value = g.id_prices || '';
+            document.getElementById('gAccPrices').value = g.account_prices || '';
+            document.getElementById('gIdPricesUsd').value = g.id_prices_usd || '';
+            document.getElementById('gAccPricesUsd').value = g.account_prices_usd || '';
+            document.getElementById('gImgFile').value = '';
+
+            document.getElementById('customMethodsContainer').innerHTML = '';
+            if (Array.isArray(g.custom_methods)) {
+                g.custom_methods.forEach(cm => addCustomMethodUI(cm.name, cm.prices, cm.prices_usd));
+            }
+
+            document.getElementById('saveGameBtn').innerHTML = "<i class='fas fa-pen'></i> تحديث المنتج";
+            document.getElementById('cancelEditBtn').style.display = 'block';
+            window.scrollTo({top:0,behavior:'smooth'});
+        }
+
+        function cancelEdit() {
+            editingGameId = null;
+            document.getElementById('saveGameBtn').innerHTML = "<i class='fas fa-cloud-upload-alt'></i> حفظ المنتج في السيستم";
+            document.getElementById('cancelEditBtn').style.display = 'none';
+            ['gName','gImg','gIdPrices','gAccPrices','gIdPricesUsd','gAccPricesUsd','gImgFile']
+                .forEach(id => { document.getElementById(id).value = ''; });
+            document.getElementById('gOrder').value = '1';
+            document.getElementById('gIdAvail').checked = false;
+            document.getElementById('gAccAvail').checked = false;
+            document.getElementById('customMethodsContainer').innerHTML = '';
+        }
+
+        async function saveCooldown() {
+            if (!isAdminReady()) return alert('يجب تسجيل الدخول أولاً.');
+            let val = parseFloat(document.getElementById('cooldownHoursInput').value);
+            if (isNaN(val) || val < 0) val = 0;
+            try {
+                // نفس المسار القديم فقط.
+                await db.ref('settings/discount_cooldown_hours').set(val);
+                alert('تم حفظ مدة حظر الخصم بنجاح!');
+            } catch (e) {
+                alert('تعذر حفظ المدة: ' + dbErrorMessage(e));
+            }
+        }
+
+        async function restartAllDiscounts() {
+            if (!isAdminReady()) return alert('يجب تسجيل الدخول أولاً.');
+            if (!confirm('تحذير: سيتم حذف الخصومات من جميع الزوار للبدء من جديد. هل أنت متأكد؟')) return;
+
+            try {
+                // هذا الزر مخصص للخصومات فقط، ولا يلمس settings.
+                await db.ref('discount_codes').remove();
+                const snap = await db.ref('discounts').once('value');
+                const updates = {};
+                snap.forEach(child => {
+                    updates[child.key + '/currentClaims'] = 0;
+                    updates[child.key + '/createdAt'] = firebase.database.ServerValue.TIMESTAMP;
+                });
+                if (Object.keys(updates).length) await db.ref('discounts').update(updates);
+                alert('تم التصفير بنجاح!');
+            } catch (e) {
+                alert('حدث خطأ أثناء التصفير: ' + dbErrorMessage(e));
+            }
+        }
+
+        async function createDiscount() {
+            if (!isAdminReady()) return alert('يجب تسجيل الدخول أولاً.');
+
+            const formattedType = document.getElementById('discType').value.trim();
+            const maxU = document.getElementById('discMaxUsers').value.trim();
+            const btn = document.getElementById('launchDiscBtn');
+
+            if (!document.getElementById('discGameSelect').value ||
+                !document.getElementById('discPackage').value.trim() ||
+                !document.getElementById('discNewPrice').value.trim() ||
+                !formattedType) {
+                return alert('يرجى ملء جميع البيانات الأساسية!');
+            }
+
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> جاري الإطلاق...';
+
+            try {
+                let finalImgUrl = document.getElementById('discImgUrl').value.trim();
+                const fileInput = document.getElementById('discImgFile');
+
+                if (fileInput.files.length) {
+                    finalImgUrl = await compressAndEncodeImage(fileInput.files[0], 1000);
+                }
+
+                const data = {
+                    gameName:document.getElementById('discGameSelect').value,
+                    type:formattedType,
+                    package:document.getElementById('discPackage').value,
+                    oldPrice:document.getElementById('discOldPrice').value,
+                    newPrice:document.getElementById('discNewPrice').value,
+                    oldPriceUsd:document.getElementById('discOldPriceUsd').value,
+                    newPriceUsd:document.getElementById('discNewPriceUsd').value,
+                    durationHours:parseFloat(document.getElementById('discDuration').value) || 24,
+                    maxUsers:(!maxU || maxU === '0') ? 'all' : parseInt(maxU,10),
+                    image:finalImgUrl,
+                    currentClaims:0,
+                    status:'active',
+                    createdAt:firebase.database.ServerValue.TIMESTAMP
+                };
+
+                await db.ref('discounts').push(data);
+                alert('تم إطلاق الخصم بنجاح! 🚀');
+                ['discPackage','discOldPrice','discNewPrice','discOldPriceUsd','discNewPriceUsd','discMaxUsers','discType','discImgUrl','discImgFile']
+                    .forEach(id => document.getElementById(id).value = '');
+            } catch (e) {
+                alert('حدث خطأ أثناء إطلاق الخصم: ' + dbErrorMessage(e));
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-rocket"></i> إطلاق الخصم الآن';
+            }
+        }
+
+        async function stopDiscount(id) {
+            if (!id || !confirm('سيتم إيقاف هذا الخصم، متأكد؟')) return;
+            if (!isAdminReady()) return alert('يجب تسجيل الدخول أولاً.');
+            try { await db.ref('discounts/' + id).update({status:'stopped'}); }
+            catch (e) { alert('تعذر إيقاف الخصم: ' + dbErrorMessage(e)); }
+        }
+
+        let currentVerifyCode = null;
+
+        async function verifyCode() {
+            if (!isAdminReady()) return alert('يجب تسجيل الدخول أولاً.');
+            let code = document.getElementById('searchCodeInput').value.trim();
+            if (!code) return alert('أدخل الكود أولاً!');
+            if (!code.startsWith('MOHABSTORE-')) code = 'MOHABSTORE-' + code;
+
+            try {
+                const snap = await db.ref('discount_codes/' + code).once('value');
+                if (!snap.exists()) {
+                    alert('هذا الكود غير موجود!');
+                    document.getElementById('codeDetailsBox').style.display = 'none';
+                    return;
+                }
+
+                const d = snap.val() || {};
+                currentVerifyCode = code;
+                const isExpired = Number(d.expiresAt || 0) < Date.now();
+                const usdPrice = d.newPriceUsd ? ` (${d.newPriceUsd})` : '';
+
+                let html = `
+                    <div class="d-row"><span>المنتج:</span> <strong>${d.game || ''}</strong></div>
+                    <div class="d-row"><span>الباقة والطريقة:</span> <strong>${d.package || ''} (${d.type || ''})</strong></div>
+                    <div class="d-row"><span>المطلوب دفعه:</span> <strong style="color:var(--warning);font-size:1.3rem;">${d.newPrice || ''}${usdPrice}</strong></div>
+                    <div class="d-row"><span>الحالة:</span> <strong>${d.status === 'shipped' ? 'مشحون ❌' : (isExpired ? 'منتهي ❌' : 'صالح ✅')}</strong></div>`;
+
+                if (d.status === 'active' && !isExpired) {
+                    html += `<button class="action-btn btn-green" style="margin-top:20px;" type="button" onclick="markCodeAsShipped()"><i class="fas fa-check-double"></i> تأكيد وتفعيل الشحن (وحظر العميل)</button>`;
+                }
+
+                document.getElementById('codeDetailsBox').innerHTML = html;
+                document.getElementById('codeDetailsBox').style.display = 'block';
+            } catch (e) {
+                alert('تعذر فحص الكود: ' + dbErrorMessage(e));
+            }
+        }
+
+        async function markCodeAsShipped() {
+            if (!currentVerifyCode || !isAdminReady()) return;
+            try {
+                await db.ref('discount_codes/' + currentVerifyCode).update({
+                    status:'shipped',
+                    shippedAt:firebase.database.ServerValue.TIMESTAMP
+                });
+                alert('تم الشحن! اختفى الخصم من العميل وتم إخضاعه لفترة الحظر.');
+                document.getElementById('searchCodeInput').value = '';
+                document.getElementById('codeDetailsBox').style.display = 'none';
+                currentVerifyCode = null;
+            } catch (e) {
+                alert('تعذر تأكيد الشحن: ' + dbErrorMessage(e));
+            }
+        }
+
+        async function writeAndVerify(ref, value) {
+            await ref.set(value);
+            const check = await ref.once('value');
+            if (!check.exists() || JSON.stringify(check.val()) !== JSON.stringify(value)) {
+                throw new Error('تمت محاولة الحفظ لكن لم يتم تأكيد البيانات من Firebase. لم يتم حذف البيانات القديمة.');
+            }
+            return check;
+        }
+
+        async function saveGameRequestSettings() {
+            if (!isAdminReady()) return alert('يجب تسجيل الدخول أولاً.');
+            const btn = document.getElementById('saveGameRequestSettingsBtn');
+            const enabled = document.getElementById('gameRequestEnabled').checked;
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> جاري الحفظ...';
+            try {
+                await writeAndVerify(db.ref('settings/gameRequest/enabled'), enabled);
+                alert(enabled ? 'تم تشغيل نافذة طلبات الألعاب.' : 'تم إيقاف نافذة طلبات الألعاب.');
+            } catch(e) { alert('تعذر حفظ حالة النافذة: ' + dbErrorMessage(e)); }
+            finally { btn.disabled=false; btn.innerHTML='<i class="fas fa-save"></i> حفظ حالة النافذة'; }
+        }
+
+        // يحتفظ بنسخة محلية من كل طلب ظاهر في Firebase. لا يوجد تجميع أو استبدال
+        // للطلبات المتشابهة؛ كل push في قاعدة البيانات = بطاقة مستقلة.
+        const gameRequestsCache = Object.create(null);
+
+        function escapeHtml(value) {
+            return String(value == null ? '' : value)
+                .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+                .replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;');
+        }
+
+        function renderGameRequests() {
+            const list = document.getElementById('gameRequestsList');
+            if (!list) return;
+            const arr = Object.keys(gameRequestsCache).map(key => ({
+                key, ...(gameRequestsCache[key] || {})
+            }));
+
+            arr.sort((a,b) => {
+                const at = Number(a.createdAt) || 0;
+                const bt = Number(b.createdAt) || 0;
+                if (bt !== at) return bt - at;
+                return String(b.key).localeCompare(String(a.key));
+            });
+
+            if (!arr.length) {
+                list.innerHTML = '<div class="request-empty"><i class="fas fa-inbox"></i><br>لا توجد طلبات ألعاب حتى الآن.</div>';
+                return;
+            }
+
+            list.innerHTML = arr.map((r,index) => {
+                const name = escapeHtml(r.gameName || r.name || 'بدون اسم');
+                const date = r.createdAt ? new Date(Number(r.createdAt)).toLocaleString('ar-EG') : 'وقت غير معروف';
+                const key = escapeHtml(r.key);
+                return `<div class="request-card" data-request-key="${key}">
+                    <div class="request-number">${index + 1}</div>
+                    <div class="request-card-main">
+                        <div class="request-game-name"><i class="fas fa-gamepad"></i>${name}</div>
+                        <div class="request-date"><i class="far fa-clock"></i>${date}</div>
+                    </div>
+                    <button class="request-delete-btn" type="button" title="حذف هذا الطلب" onclick="deleteGameRequest('${key}')">
+                        <i class="fas fa-trash-alt"></i>
+                    </button>
+                </div>`;
+            }).join('');
+        }
+
+        function syncGameRequestsFromSnapshot(snap) {
+            // نضيف كل السجلات الموجودة، ولا نمسح الكاش هنا حتى لا يحدث سباق
+            // بين value و child_added عند فتح الصفحة. child_removed هو المسؤول عن الحذف.
+            if (snap && snap.exists()) {
+                snap.forEach(child => {
+                    gameRequestsCache[child.key] = child.val() || {};
+                });
+            }
+            renderGameRequests();
+        }
+
+        async function deleteGameRequest(key) {
+            if (!key || !isAdminReady()) return;
+            if (!confirm('حذف طلب اللعبة هذا؟')) return;
+            try { await db.ref('gameRequests/' + key).remove(); }
+            catch(e){ alert('تعذر حذف الطلب: '+dbErrorMessage(e)); }
+        }
+
+        async function clearGameRequests() {
+            if (!isAdminReady()) return alert('يجب تسجيل الدخول أولاً.');
+            if (!confirm('سيتم حذف جميع طلبات الألعاب فقط. هل أنت متأكد؟')) return;
+            try { await db.ref('gameRequests').remove(); alert('تم حذف طلبات الألعاب.'); }
+            catch(e){ alert('تعذر حذف الطلبات: '+dbErrorMessage(e)); }
+        }
+
+        function startDataListeners() {
+            if (dataListenersStarted || !isAdminReady()) return;
+            dataListenersStarted = true;
+
+            const logoRef = db.ref('settings/general/logo');
+            safeListener(logoRef, snap => {
+                // لا نمسح الحقل عند snapshot فارغ؛ هذا يمنع اختفاء القيمة بسبب لقطة فارغة/مؤقتة.
+                if (!snap.exists()) return;
+                const val = snap.val();
+                if (typeof val === 'string') {
+                    document.getElementById('logoUrl').value = val.length > 200 ? '' : val;
+                }
+            });
+
+            const bannersRef = db.ref('settings/banners');
+            safeListener(bannersRef, renderBanners);
+
+            const welcomeRef = db.ref('settings/welcomePopup');
+            safeListener(welcomeRef, snap => {
+                // عدم وجود العقدة لا يعني أن المستخدم يريد مسح ما يكتبه الآن.
+                if (!snap.exists()) return;
+                const data = snap.val() || {};
+                document.getElementById('welcomePopupEnabled').checked = data.enabled !== false;
+                document.getElementById('welcomePopupDuration').value = Math.max(1, parseInt(data.duration,10) || 10);
+                document.getElementById('welcomePopupImageUrl').value =
+                    (typeof data.image === 'string' && data.image.length < 200) ? data.image : '';
+                document.getElementById('welcomePopupLink').value = data.link || '';
+                updateWelcomePopupPreview(data.image || '');
+            });
+
+            const gameRequestSettingsRef = db.ref('settings/gameRequest/enabled');
+            safeListener(gameRequestSettingsRef, snap => {
+                document.getElementById('gameRequestEnabled').checked = !snap.exists() || snap.val() !== false;
+            });
+
+            const gameRequestsRef = db.ref('gameRequests');
+            // value: تحميل كل السجلات الموجودة بالفعل.
+            safeListener(gameRequestsRef, syncGameRequestsFromSnapshot);
+            // child listeners: إضافة/تعديل/حذف كل طلب فورياً بدون استبدال الطلبات السابقة.
+            const onRequestAdded = snap => { gameRequestsCache[snap.key] = snap.val() || {}; renderGameRequests(); };
+            const onRequestChanged = snap => { gameRequestsCache[snap.key] = snap.val() || {}; renderGameRequests(); };
+            const onRequestRemoved = snap => { delete gameRequestsCache[snap.key]; renderGameRequests(); };
+            gameRequestsRef.on('child_added', onRequestAdded);
+            gameRequestsRef.on('child_changed', onRequestChanged);
+            gameRequestsRef.on('child_removed', onRequestRemoved);
+            activeDbListeners.push({ref:gameRequestsRef, listener:onRequestAdded, event:'child_added'});
+            activeDbListeners.push({ref:gameRequestsRef, listener:onRequestChanged, event:'child_changed'});
+            activeDbListeners.push({ref:gameRequestsRef, listener:onRequestRemoved, event:'child_removed'});
+
+            const socialsRef = db.ref('settings/socials');
+            safeListener(socialsRef, renderSocials);
+
+            const gamesRef = db.ref('games');
+            safeListener(gamesRef, renderGames);
+
+            const cooldownRef = db.ref('settings/discount_cooldown_hours');
+            safeListener(cooldownRef, snap => {
+                if (snap.exists()) document.getElementById('cooldownHoursInput').value = snap.val();
+            });
+
+            const discountsRef = db.ref('discounts');
+            safeListener(discountsRef, snap => {
+                let html = '';
+                snap.forEach(child => {
+                    const d = child.val() || {};
+                    if (d.status !== 'active') return;
+                    const usage = d.maxUsers === 'all' ? 'مفتوح' : `${d.currentClaims || 0}/${d.maxUsers}`;
+                    const imgPreview = d.image ? `<img src="${String(d.image).replace(/"/g,'&quot;')}" style="width:45px;height:45px;border-radius:10px;object-fit:cover;margin-right:15px;border:1px solid #cbd5e1;">` : '';
+                    html += `<div class="admin-card" style="justify-content:flex-start;">
+                        ${imgPreview}
+                        <div style="flex:1;">
+                            <strong style="font-size:1.1rem;">${d.gameName || ''} - ${d.package || ''}</strong>
+                            <span class="badge badge-active" style="margin-right:10px;">${d.newPrice || ''}</span>
+                            <div style="font-size:.85rem;color:var(--text-light);margin-top:8px;">الطريقة: ${d.type || ''} | المستفيدين: ${usage} | المدة: ${d.durationHours || 0}س</div>
+                        </div>
+                        <button class="btn-small btn-red" type="button" style="margin-right:auto;" onclick="stopDiscount('${child.key}')"><i class="fas fa-power-off"></i> إيقاف</button>
+                    </div>`;
+                });
+                document.getElementById('activeDiscountsList').innerHTML =
+                    html || '<p style="color:#888;text-align:center;">لا توجد خصومات نشطة حالياً.</p>';
+            });
+
+            const codesRef = db.ref('discount_codes').orderByChild('expiresAt').limitToLast(15);
+            safeListener(codesRef, snap => {
+                let html = '', arr = [];
+                snap.forEach(c => arr.push({key:c.key, ...(c.val() || {})}));
+                arr.reverse();
+                arr.forEach(c => {
+                    const statusBadge = c.status === 'active'
+                        ? (Number(c.expiresAt || 0) > Date.now()
+                            ? '<span class="badge badge-active">نشط / بانتظار الشحن</span>'
+                            : '<span class="badge" style="background:var(--danger);color:#fff;">منتهي</span>')
+                        : '<span class="badge badge-shipped">تم الشحن</span>';
+                    html += `<div class="admin-card">
+                        <div>
+                            <strong style="color:var(--primary);font-family:monospace;font-size:1.1rem;">${c.key}</strong>
+                            <div style="font-size:.9rem;color:var(--text-light);margin-top:5px;">${c.game || ''} - ${c.package || ''} (${c.type || ''})</div>
+                        </div>
+                        <div style="margin-top:10px;">${statusBadge}</div>
+                    </div>`;
+                });
+                document.getElementById('recentCodesList').innerHTML =
+                    html || '<p style="color:#888;text-align:center;">لا توجد أكواد مسحوبة بعد.</p>';
+            });
+        }
+
+        // مستمعو الصور لا يبدأون إلا بعد نجاح تسجيل الدخول المصرح به.
+        auth.onAuthStateChanged(user => {
+            if (user && (user.email || '').toLowerCase() === AUTHORIZED_EMAIL.toLowerCase()) {
+                showAdminApp(user);
+                startDataListeners();
+            } else {
+                stopDataListeners();
+                if (user) auth.signOut();
+                hideAdminApp();
+            }
         });
 
         document.getElementById('welcomePopupImageFile').addEventListener('change', function() {
@@ -730,332 +1437,6 @@
             if (this.value.trim()) updateWelcomePopupPreview(this.value.trim());
         });
 
-        async function saveWelcomePopup() {
-            const btn = document.getElementById('saveWelcomePopupBtn');
-            const fileInput = document.getElementById('welcomePopupImageFile');
-            const urlInput = document.getElementById('welcomePopupImageUrl').value.trim();
-            const enabled = document.getElementById('welcomePopupEnabled').checked;
-            const duration = Math.max(1, Math.min(300,
-                parseInt(document.getElementById('welcomePopupDuration').value, 10) || 10
-            ));
-            const link = document.getElementById('welcomePopupLink').value.trim();
-
-            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> جاري الحفظ...';
-            try {
-                let image = urlInput;
-
-                if (fileInput.files.length > 0) {
-                    image = await compressAndEncodeImage(fileInput.files[0], 1000);
-                } else if (!image) {
-                    const current = await db.ref('settings/welcomePopup/image').once('value');
-                    image = current.val() || '';
-                }
-
-                await db.ref('settings/welcomePopup').update({
-                    enabled: enabled,
-                    image: image,
-                    duration: duration,
-                    link: link
-                });
-
-                if (fileInput.files.length) fileInput.value = '';
-                updateWelcomePopupPreview(image);
-                alert("تم حفظ إعدادات إشعار الدخول بنجاح!");
-            } catch (e) {
-                console.error(e);
-                alert("حدث خطأ أثناء حفظ الإشعار!");
-            }
-            btn.innerHTML = '<i class="fas fa-save"></i> حفظ إعدادات الإشعار';
-        }
-
-        function disableWelcomePopup() {
-            db.ref('settings/welcomePopup/enabled').set(false)
-                .then(() => alert("تم إيقاف إشعار الدخول."));
-        }
-
-        const iconsMap = { 'whatsapp': 'fab fa-whatsapp', 'facebook': 'fab fa-facebook-f', 'telegram': 'fab fa-telegram-plane', 'instagram': 'fab fa-instagram', 'youtube': 'fab fa-youtube', 'warranty': 'fas fa-star' };
-        db.ref('settings/socials').on('value', snap => {
-            let html = ''; 
-            snap.forEach(c => {
-                let s = c.val();
-                let iconClass = iconsMap[s.platform] || 'fas fa-link';
-                html += `<div class="admin-card">
-                            <div style="display:flex; align-items:center; gap:15px; min-width:150px;">
-                                <div style="background:rgba(14,165,233,0.1); width:45px; height:45px; display:flex; align-items:center; justify-content:center; border-radius:12px; color:var(--primary); font-size:1.3rem;">
-                                    <i class="${iconClass}"></i>
-                                </div>
-                                <strong style="font-size:1.1rem;">${s.name}</strong>
-                            </div>
-                            <div style="flex:1; font-size:0.85rem; color:var(--text-light); direction:ltr; text-align:left; word-break: break-all;">${s.url}</div>
-                            <button class="btn-small btn-red" onclick="if(confirm('حذف هذا الزر؟')) db.ref('settings/socials/${c.key}').remove()"><i class="fas fa-trash"></i></button>
-                         </div>`;
-            });
-            document.getElementById('socialsList').innerHTML = html || '<div class="admin-card" style="justify-content:center; color:#94a3b8;">لا توجد أزرار مضافة.</div>';
-        });
-        function addSocial() { 
-            const p=document.getElementById('socialPlatform').value, n=document.getElementById('socialName').value, u=document.getElementById('socialUrl').value; 
-            if(n&&u) db.ref('settings/socials').push({platform:p,name:n,url:u}).then(()=>{document.getElementById('socialName').value='';document.getElementById('socialUrl').value='';}); 
-        }
-
-        db.ref('games').on('value', snap => {
-            globalGames = snap.val() || {};
-            let html = ''; let selectHtml = '';
-            let arr = Object.keys(globalGames).map(k => ({ key: k, ...globalGames[k] })).sort((a,b)=>(a.order||99)-(b.order||99));
-            arr.forEach(g => {
-                html += `<div class="admin-card">
-                            <div style="display:flex; align-items:center; gap:15px;">
-                                <img src="${g.img}" width="50" height="50" style="border-radius:12px; object-fit:cover; border:1px solid #e2e8f0;">
-                                <strong style="font-size:1.1rem;">${g.name}</strong>
-                            </div>
-                            <div class="btn-group">
-                                <button class="btn-small btn-yellow" onclick="editGame('${g.key}')"><i class="fas fa-pen"></i> تعديل</button>
-                                <button class="btn-small btn-red" onclick="if(confirm('متأكد من الحذف؟')) db.ref('games/${g.key}').remove()"><i class="fas fa-trash"></i></button>
-                            </div>
-                        </div>`;
-                selectHtml += `<option value="${g.name}">${g.name}</option>`;
-            });
-            document.getElementById('gamesList').innerHTML = html;
-            document.getElementById('discGameSelect').innerHTML = selectHtml; 
-        });
-
-        function addCustomMethodUI(name = '', prices = '', pricesUsd = '') {
-            const container = document.getElementById('customMethodsContainer');
-            const div = document.createElement('div');
-            div.className = 'custom-method-item';
-            div.innerHTML = `
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
-                    <label style="margin:0; font-size: 1.1rem; color: var(--primary);">إعدادات الطريقة</label>
-                    <button class="btn-small btn-red" onclick="this.parentElement.parentElement.remove()"><i class="fas fa-trash"></i> حذف</button>
-                </div>
-                <input type="text" class="cm-name" placeholder="اسم الطريقة (مثل: عن طريق رقم الموبايل)" value="${name}" style="margin-bottom:15px;">
-                <div class="row">
-                    <div><label>الأسعار (بالمصري):</label><textarea class="cm-prices" placeholder="مثال: باقة فليكس = 50 ج">${prices}</textarea></div>
-                    <div><label>الأسعار (بالدولار):</label><textarea class="cm-prices-usd">${pricesUsd}</textarea></div>
-                </div>
-            `;
-            container.appendChild(div);
-        }
-
-        async function handleSaveGame() {
-            let name = document.getElementById('gName').value.trim();
-            if(!name) return alert("الاسم مطلوب");
-
-            const btn = document.getElementById('saveGameBtn');
-            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> جاري الحفظ...';
-            btn.disabled = true;
-
-            try {
-                const fileInput = document.getElementById('gImgFile');
-                let finalImgUrl = document.getElementById('gImg').value.trim();
-
-                // عند تعديل منتج وعدم اختيار صورة جديدة، احتفظ بالصورة القديمة كما هي.
-                if(fileInput.files.length > 0) {
-                    finalImgUrl = await compressAndEncodeImage(fileInput.files[0]);
-                } else if (!finalImgUrl && editingGameId && globalGames[editingGameId]) {
-                    finalImgUrl = globalGames[editingGameId].img || '';
-                }
-
-                let custom_methods = [];
-                document.querySelectorAll('.custom-method-item').forEach(item => {
-                    let mName = item.querySelector('.cm-name').value.trim();
-                    if(mName) {
-                        custom_methods.push({
-                            name: mName,
-                            prices: item.querySelector('.cm-prices').value,
-                            prices_usd: item.querySelector('.cm-prices-usd').value
-                        });
-                    }
-                });
-
-                const newData = {
-                    name: name,
-                    img: finalImgUrl,
-                    order: parseInt(document.getElementById('gOrder').value) || 99,
-                    id_available: document.getElementById('gIdAvail').checked,
-                    account_available: document.getElementById('gAccAvail').checked,
-                    id_prices: document.getElementById('gIdPrices').value,
-                    account_prices: document.getElementById('gAccPrices').value,
-                    id_prices_usd: document.getElementById('gIdPricesUsd').value,
-                    account_prices_usd: document.getElementById('gAccPricesUsd').value,
-                    custom_methods: custom_methods
-                };
-
-                if (editingGameId) {
-                    // مهم: update بدلاً من set حتى لا نحذف أي حقول قديمة غير موجودة في هذه الواجهة.
-                    await db.ref('games/' + editingGameId).update(newData);
-                } else {
-                    await db.ref('games').push(newData);
-                }
-
-                alert("تم الحفظ بنجاح بدون حذف البيانات الأخرى.");
-                cancelEdit();
-            } catch (e) {
-                console.error(e);
-                alert("حدث خطأ أثناء الحفظ: " + (e.message || 'خطأ غير معروف'));
-            } finally {
-                btn.disabled = false;
-                btn.innerHTML = '<i class="fas fa-cloud-upload-alt"></i> حفظ المنتج في السيستم';
-            }
-        }
-
-        function editGame(id) {
-            editingGameId = id; const g = globalGames[id];
-            document.getElementById('gName').value = g.name; 
-            document.getElementById('gImg').value = (g.img && g.img.length > 200) ? '' : (g.img || ''); 
-            document.getElementById('gOrder').value = g.order||99;
-            document.getElementById('gIdAvail').checked = g.id_available||false; document.getElementById('gAccAvail').checked = g.account_available||false;
-            document.getElementById('gIdPrices').value = g.id_prices||''; document.getElementById('gAccPrices').value = g.account_prices||'';
-            document.getElementById('gIdPricesUsd').value = g.id_prices_usd||''; document.getElementById('gAccPricesUsd').value = g.account_prices_usd||'';
-            document.getElementById('customMethodsContainer').innerHTML = '';
-            if (g.custom_methods && g.custom_methods.length > 0) g.custom_methods.forEach(cm => addCustomMethodUI(cm.name, cm.prices, cm.prices_usd));
-            document.getElementById('saveGameBtn').innerHTML = "<i class='fas fa-pen'></i> تحديث المنتج"; 
-            document.getElementById('cancelEditBtn').style.display = "block";
-            window.scrollTo({top:0, behavior: 'smooth'});
-        }
-
-        function cancelEdit() {
-            editingGameId = null; 
-            document.getElementById('saveGameBtn').innerHTML = "<i class='fas fa-cloud-upload-alt'></i> حفظ المنتج في السيستم"; 
-            document.getElementById('cancelEditBtn').style.display = "none";
-            ['gName','gImg','gIdPrices','gAccPrices','gIdPricesUsd','gAccPricesUsd', 'gImgFile'].forEach(id => document.getElementById(id).value = '');
-            document.getElementById('gOrder').value = '1'; document.getElementById('gIdAvail').checked = false; document.getElementById('gAccAvail').checked = false;
-            document.getElementById('customMethodsContainer').innerHTML = '';
-        }
-
-        db.ref('settings/discount_cooldown_hours').on('value', snap => { document.getElementById('cooldownHoursInput').value = snap.exists() ? snap.val() : 24; });
-
-        function saveCooldown() {
-            let val = parseFloat(document.getElementById('cooldownHoursInput').value);
-            if(isNaN(val) || val < 0) val = 0;
-            db.ref('settings/discount_cooldown_hours').set(val).then(() => alert("تم حفظ مدة حظر الخصم بنجاح!"));
-        }
-
-        function restartAllDiscounts() {
-            if(confirm("تحذير: سيتم حذف الخصومات من جميع الزوار للبدء من جديد. هل أنت متأكد؟")) {
-                db.ref('discount_codes').remove();
-                db.ref('discounts').once('value', snap => {
-                    let updates = {};
-                    snap.forEach(child => { updates[child.key + '/currentClaims'] = 0; updates[child.key + '/createdAt'] = firebase.database.ServerValue.TIMESTAMP; });
-                    if(Object.keys(updates).length > 0) db.ref('discounts').update(updates);
-                }).then(() => alert("تم التصفير بنجاح!"));
-            }
-        }
-
-        // تم تعديل هذه الدالة لاستقبال الصورة ورفعها
-        async function createDiscount() {
-            const formattedType = document.getElementById('discType').value;
-            let maxU = document.getElementById('discMaxUsers').value;
-            const btn = document.getElementById('launchDiscBtn');
-
-            if(!document.getElementById('discGameSelect').value || !document.getElementById('discPackage').value || !document.getElementById('discNewPrice').value || !formattedType) {
-                return alert("يرجى ملء جميع البيانات الأساسية!");
-            }
-
-            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> جاري الإطلاق...';
-
-            let finalImgUrl = document.getElementById('discImgUrl').value;
-            const fileInput = document.getElementById('discImgFile');
-            
-            if(fileInput.files.length > 0) {
-                try { finalImgUrl = await compressAndEncodeImage(fileInput.files[0]); }
-                catch(e) { alert("حدث خطأ في معالجة الصورة"); btn.innerHTML = '<i class="fas fa-rocket"></i> إطلاق الخصم الآن'; return; }
-            }
-
-            const data = {
-                gameName: document.getElementById('discGameSelect').value,
-                type: formattedType,
-                package: document.getElementById('discPackage').value,
-                oldPrice: document.getElementById('discOldPrice').value,
-                newPrice: document.getElementById('discNewPrice').value,
-                oldPriceUsd: document.getElementById('discOldPriceUsd').value,
-                newPriceUsd: document.getElementById('discNewPriceUsd').value,
-                durationHours: parseFloat(document.getElementById('discDuration').value) || 24,
-                maxUsers: (!maxU || maxU === '0') ? 'all' : parseInt(maxU),
-                image: finalImgUrl, // تم إضافة الصورة هنا
-                currentClaims: 0, status: 'active',
-                createdAt: firebase.database.ServerValue.TIMESTAMP
-            };
-
-            db.ref('discounts').push(data).then(() => {
-                alert("تم إطلاق الخصم بنجاح! 🚀");
-                ['discPackage','discOldPrice','discNewPrice','discOldPriceUsd','discNewPriceUsd','discMaxUsers','discType', 'discImgUrl', 'discImgFile'].forEach(id => document.getElementById(id).value = '');
-                btn.innerHTML = '<i class="fas fa-rocket"></i> إطلاق الخصم الآن';
-            }).catch(e => { console.error(e); alert('حدث خطأ أثناء إطلاق الخصم: ' + (e.message || '')); btn.innerHTML = '<i class="fas fa-rocket"></i> إطلاق الخصم الآن'; });
-        }
-
-        db.ref('discounts').on('value', snap => {
-            let html = '';
-            snap.forEach(child => {
-                let d = child.val();
-                if(d.status === 'active') {
-                    let usage = d.maxUsers === 'all' ? 'مفتوح' : `${d.currentClaims}/${d.maxUsers}`;
-                    let imgPreview = d.image ? `<img src="${d.image}" style="width:45px; height:45px; border-radius:10px; object-fit:cover; margin-right:15px; border: 1px solid #cbd5e1;">` : '';
-                    
-                    html += `
-                    <div class="admin-card" style="justify-content:flex-start;">
-                        ${imgPreview}
-                        <div style="flex:1;">
-                            <strong style="font-size:1.1rem;">${d.gameName} - ${d.package}</strong> 
-                            <span class="badge badge-active" style="margin-right:10px;">${d.newPrice}</span>
-                            <div style="font-size: 0.85rem; color:var(--text-light); margin-top:8px;">الطريقة: ${d.type} | المستفيدين: ${usage} | المدة: ${d.durationHours}س</div>
-                        </div>
-                        <button class="btn-small btn-red" style="margin-right:auto;" onclick="stopDiscount('${child.key}')"><i class="fas fa-power-off"></i> إيقاف</button>
-                    </div>`;
-                }
-            });
-            document.getElementById('activeDiscountsList').innerHTML = html || '<p style="color:#888; text-align:center;">لا توجد خصومات نشطة حالياً.</p>';
-        });
-
-        function stopDiscount(id) { if(confirm("سيتم إيقاف هذا الخصم، متأكد؟")) db.ref('discounts/' + id).update({ status: 'stopped' }); }
-
-        db.ref('discount_codes').orderByChild('expiresAt').limitToLast(15).on('value', snap => {
-            let html = ''; let arr = [];
-            snap.forEach(c => arr.push({key: c.key, ...c.val()}));
-            arr.reverse();
-            arr.forEach(c => {
-                let statusBadge = c.status === 'active' 
-                    ? (c.expiresAt > Date.now() ? '<span class="badge badge-active">نشط / بانتظار الشحن</span>' : '<span class="badge" style="background:var(--danger); color:#fff;">منتهي</span>')
-                    : '<span class="badge badge-shipped">تم الشحن</span>';
-                html += `
-                <div class="admin-card">
-                    <div>
-                        <strong style="color:var(--primary); font-family: monospace; font-size:1.1rem;">${c.key}</strong>
-                        <div style="font-size: 0.9rem; color:var(--text-light); margin-top: 5px;">${c.game} - ${c.package} (${c.type})</div>
-                    </div>
-                    <div style="margin-top:10px;">${statusBadge}</div>
-                </div>`;
-            });
-            document.getElementById('recentCodesList').innerHTML = html || '<p style="color:#888; text-align:center;">لا توجد أكواد مسحوبة بعد.</p>';
-        });
-
-        let currentVerifyCode = null;
-        function verifyCode() {
-            let code = document.getElementById('searchCodeInput').value.trim();
-            if(!code) return alert("أدخل الكود أولاً!");
-            if(!code.startsWith("MOHABSTORE-")) code = "MOHABSTORE-" + code;
-            db.ref('discount_codes/' + code).once('value', snap => {
-                if(snap.exists()) {
-                    let d = snap.val(); currentVerifyCode = code; let isExpired = d.expiresAt < Date.now();
-                    let usdPrice = d.newPriceUsd ? ` (${d.newPriceUsd})` : '';
-                    let html = `
-                        <div class="d-row"><span>المنتج:</span> <strong>${d.game}</strong></div>
-                        <div class="d-row"><span>الباقة والطريقة:</span> <strong>${d.package} (${d.type})</strong></div>
-                        <div class="d-row"><span>المطلوب دفعه:</span> <strong style="color:var(--warning); font-size:1.3rem;">${d.newPrice}${usdPrice}</strong></div>
-                        <div class="d-row"><span>الحالة:</span> <strong>${d.status === 'shipped' ? 'مشحون ❌' : (isExpired ? 'منتهي ❌' : 'صالح ✅')}</strong></div>
-                    `;
-                    if(d.status === 'active' && !isExpired) html += `<button class="action-btn btn-green" style="margin-top:20px;" onclick="markCodeAsShipped()"><i class="fas fa-check-double"></i> تأكيد وتفعيل الشحن (وحظر العميل)</button>`;
-                    document.getElementById('codeDetailsBox').innerHTML = html; document.getElementById('codeDetailsBox').style.display = 'block';
-                } else { alert("هذا الكود غير موجود!"); document.getElementById('codeDetailsBox').style.display = 'none'; }
-            });
-        }
-        function markCodeAsShipped() {
-            if(currentVerifyCode) {
-                db.ref('discount_codes/' + currentVerifyCode).update({ status: 'shipped', shippedAt: firebase.database.ServerValue.TIMESTAMP }).then(() => {
-                    alert("تم الشحن! اختفى الخصم من العميل وتم إخضاعه لفترة الحظر.");
-                    document.getElementById('searchCodeInput').value = ''; document.getElementById('codeDetailsBox').style.display = 'none';
-                });
-            }
-        }
     </script>
 </body>
 </html>
