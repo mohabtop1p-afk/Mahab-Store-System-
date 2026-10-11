@@ -400,7 +400,8 @@
             <h2 id="gameSectionTitle">إدارة المنتجات <i class="fas fa-box-open" style="color:var(--primary);"></i></h2>
             <div class="form-section" style="border-top: 4px solid var(--primary);">
                 <div class="row">
-                    <div style="flex:2;"><label>اسم المنتج (مثال: فري فاير):</label><input type="text" id="gName"></div>
+                    <div style="flex:2;"><label>اسم العنصر:</label><input type="text" id="gName" placeholder="اسم اللعبة أو الموقع الخارجي"></div>
+                    <div><label>نوع العنصر:</label><select id="gKind" onchange="toggleExternalFields()"><option value="prices">قائمة أسعار / شحن</option><option value="external">رابط موقع خارجي</option></select></div>
                     <div><label>الترتيب:</label><input type="number" id="gOrder" value="1"></div>
                 </div>
                 
@@ -410,12 +411,28 @@
                     <input type="file" id="gImgFile" accept="image/*" class="file-input">
                 </div>
                 
-                <div style="display:flex; gap: 20px; margin-bottom: 20px; background: #f1f5f9; padding: 15px; border-radius: 12px; border: 1px solid #e2e8f0;">
+                <div id="externalFields" style="display:none;padding:16px;margin-bottom:18px;border:1px dashed var(--primary);border-radius:14px;background:#f0f9ff;">
+                    <label>رابط الموقع الخارجي (يبدأ بـ https://):</label>
+                    <input type="url" id="gExternalUrl" placeholder="https://example.com">
+                    <p style="font-size:.8rem;color:#64748b;line-height:1.7;margin-top:8px">سيظهر كعنصر مستقل في شبكة الموقع. يمكن إخفاء الرابط من الواجهة، لكن الترميز ليس تشفيراً أمنياً ولا يخفيه عن أدوات المطور.</p>
+                </div>
+                <div class="row" id="priceIconFields">
+                    <div><label>أيقونة باقات الأسعار (رابط صورة اختياري):</label><input type="url" id="gPriceIcon" placeholder="https://.../icon.png"></div>
+                    <div><label>أو اختر الصورة من المعرض:</label><input type="file" id="gPriceIconFile" accept="image/*" class="file-input"></div>
+                </div>
+                <div id="packageIconManager" style="margin:14px 0 20px;padding:16px;border:1px solid #cbd5e1;border-radius:14px;background:#f8fafc;">
+                    <h4 style="margin:0 0 8px;color:#0f172a"><i class="fas fa-images"></i> أيقونة خاصة لباقة معينة (اختياري)</h4>
+                    <p style="font-size:.86rem;color:#64748b;line-height:1.7;margin:0 0 12px">الصورة العامة بالأعلى ستظهر في كل الباقات. لو عايز باقة محددة بصورة مختلفة، حدّث قائمة الباقات ثم اختر صورة أو رابطاً للباقة المطلوبة فقط.</p>
+                    <button type="button" class="btn-small" onclick="refreshPackageIconRows()" style="margin-bottom:12px"><i class="fas fa-sync-alt"></i> تحديث قائمة الباقات من الأسعار</button>
+                    <div id="packageIconRows"><div style="color:#64748b;font-size:.85rem">اكتب الأسعار أولاً ثم اضغط «تحديث قائمة الباقات».</div></div>
+                </div>
+
+                <div id="shippingFlags" style="display:flex; gap: 20px; margin-bottom: 20px; background: #f1f5f9; padding: 15px; border-radius: 12px; border: 1px solid #e2e8f0;">
                     <label style="margin:0; cursor:pointer;"><input type="checkbox" id="gIdAvail" style="transform: scale(1.2); margin-left: 8px;"> شحن ID</label>
                     <label style="margin:0; cursor:pointer;"><input type="checkbox" id="gAccAvail" style="transform: scale(1.2); margin-left: 8px;"> شحن حساب</label>
                 </div>
 
-                <div class="row">
+                <div class="row price-inputs">
                     <div><label>أسعار ID (بالمصري):</label><textarea id="gIdPrices" placeholder="مثال: 100 جوهرة = 50 ج"></textarea></div>
                     <div><label>أسعار الحساب (بالمصري):</label><textarea id="gAccPrices"></textarea></div>
                 </div>
@@ -970,6 +987,57 @@
             container.appendChild(div);
         }
 
+        function getPackageNamesForIcons() {
+            const ids = ['gIdPrices','gAccPrices','gIdPricesUsd','gAccPricesUsd'];
+            const names = [];
+            ids.forEach(id => {
+                const el = document.getElementById(id);
+                if (!el) return;
+                el.value.split('\n').forEach(line => {
+                    const eq = line.indexOf('=');
+                    if (eq < 1) return;
+                    const name = line.slice(0, eq).trim();
+                    if (name && !names.includes(name)) names.push(name);
+                });
+            });
+            document.querySelectorAll('#customMethodsContainer .custom-method-item').forEach(item => {
+                ['.cm-prices','.cm-prices-usd'].forEach(sel => {
+                    const el = item.querySelector(sel); if (!el) return;
+                    el.value.split('\n').forEach(line => { const eq=line.indexOf('='); if(eq>0){const name=line.slice(0,eq).trim();if(name&&!names.includes(name))names.push(name);} });
+                });
+            });
+            return names;
+        }
+
+        function refreshPackageIconRows(existingIcons) {
+            const holder = document.getElementById('packageIconRows');
+            if (!holder) return;
+            const icons = existingIcons || (editingGameId && globalGames[editingGameId] && globalGames[editingGameId].package_icons) || {};
+            const names = getPackageNamesForIcons();
+            if (!names.length) { holder.innerHTML = '<div style="color:#64748b;font-size:.85rem">لم أجد باقات مكتوبة بصيغة «اسم الباقة = السعر». اكتب الأسعار ثم اضغط تحديث القائمة.</div>'; return; }
+            holder.innerHTML = names.map(name => {
+                const safeName = name.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+                const value = icons[name] || '';
+                const valueForInput = value.length < 200 ? value.replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;') : '';
+                const preview = value ? `<img src="${value}" alt="" style="width:36px;height:36px;object-fit:contain;border-radius:8px;background:#e2e8f0;padding:3px" onerror="this.style.display='none'">` : '';
+                return `<div class="package-icon-row" data-pack-name="${safeName}" style="display:grid;grid-template-columns:minmax(70px,.8fr) minmax(100px,1.4fr) auto;align-items:center;gap:8px;padding:10px 0;border-bottom:1px solid #e2e8f0">
+                    <div style="font-weight:700;color:#0f172a;font-size:.88rem;overflow-wrap:anywhere">${safeName}</div>
+                    <div style="display:flex;flex-direction:column;gap:6px"><input class="package-icon-url" type="url" value="${valueForInput}" placeholder="رابط صورة لهذه الباقة" style="width:100%;box-sizing:border-box"><label style="font-size:.78rem;color:#475569">أو اختر من المعرض <input class="package-icon-file" type="file" accept="image/*" style="display:block;width:100%;font-size:.76rem;margin-top:4px"></label><label style="font-size:.75rem;color:#64748b"><input type="checkbox" class="package-icon-clear"> حذف الأيقونة الخاصة والرجوع للصورة العامة</label></div>
+                    <div class="package-icon-preview">${preview}</div>
+                </div>`;
+            }).join('');
+        }
+
+        function toggleExternalFields() {
+            const external = document.getElementById('gKind').value === 'external';
+            document.getElementById('externalFields').style.display = external ? 'block' : 'none';
+            document.getElementById('shippingFlags').style.display = external ? 'none' : 'flex';
+            document.querySelectorAll('.price-inputs').forEach(el => el.style.display = external ? 'none' : 'flex');
+            document.getElementById('customMethodsSection').style.display = external ? 'none' : 'block';
+            document.getElementById('priceIconFields').style.display = external ? 'none' : 'flex';
+            const packageIcons = document.getElementById('packageIconManager'); if (packageIcons) packageIcons.style.display = external ? 'none' : 'block';
+        }
+
         async function handleSaveGame() {
             if (!isAdminReady()) return alert('يجب تسجيل الدخول أولاً.');
             const name = document.getElementById('gName').value.trim();
@@ -989,6 +1057,15 @@
                     finalImgUrl = globalGames[editingGameId].img || '';
                 }
 
+                let finalPriceIcon = document.getElementById('gPriceIcon').value.trim();
+                const priceIconFile = document.getElementById('gPriceIconFile');
+                if (priceIconFile.files.length) finalPriceIcon = await compressAndEncodeImage(priceIconFile.files[0], 400);
+                else if (!finalPriceIcon && editingGameId && globalGames[editingGameId]) finalPriceIcon = globalGames[editingGameId].price_icon || '';
+
+                const kind = document.getElementById('gKind').value || 'prices';
+                const externalUrl = document.getElementById('gExternalUrl').value.trim();
+                if (kind === 'external' && !/^https:\/\//i.test(externalUrl)) throw new Error('أدخل رابطاً صحيحاً يبدأ بـ https://');
+
                 const custom_methods = [];
                 document.querySelectorAll('.custom-method-item').forEach(item => {
                     const mName = item.querySelector('.cm-name').value.trim();
@@ -999,9 +1076,26 @@
                     });
                 });
 
+                // الاحتفاظ بالأيقونات المخصصة القديمة ثم تحديث الصفوف التي أدخلها المستخدم.
+                const packageIcons = Object.assign({}, (editingGameId && globalGames[editingGameId] && globalGames[editingGameId].package_icons) || {});
+                for (const row of document.querySelectorAll('.package-icon-row')) {
+                    const packName = row.getAttribute('data-pack-name') || '';
+                    const urlInput = row.querySelector('.package-icon-url');
+                    const fileInput = row.querySelector('.package-icon-file');
+                    let iconUrl = urlInput ? urlInput.value.trim() : '';
+                    if (fileInput && fileInput.files && fileInput.files.length) iconUrl = await compressAndEncodeImage(fileInput.files[0], 300);
+                    if (packName && iconUrl) packageIcons[packName] = iconUrl;
+                    else if (packName && !iconUrl && row.querySelector('.package-icon-clear')?.checked) delete packageIcons[packName];
+                }
+
                 const newData = {
                     name,
                     img:finalImgUrl,
+                    kind,
+                    external_url: kind === 'external' ? externalUrl : '',
+                    external_url_b64: kind === 'external' ? btoa(externalUrl) : '',
+                    price_icon: finalPriceIcon,
+                    package_icons: packageIcons,
                     order:parseInt(document.getElementById('gOrder').value,10) || 99,
                     id_available:document.getElementById('gIdAvail').checked,
                     account_available:document.getElementById('gAccAvail').checked,
@@ -1035,6 +1129,11 @@
             const g = globalGames[id];
 
             document.getElementById('gName').value = g.name || '';
+            document.getElementById('gKind').value = g.kind || 'prices';
+            document.getElementById('gExternalUrl').value = g.external_url || '';
+            document.getElementById('gPriceIcon').value = (g.price_icon && g.price_icon.length < 200) ? g.price_icon : '';
+            document.getElementById('gPriceIconFile').value = '';
+            toggleExternalFields();
             document.getElementById('gImg').value = (g.img && g.img.length > 200) ? '' : (g.img || '');
             document.getElementById('gOrder').value = g.order || 99;
             document.getElementById('gIdAvail').checked = !!g.id_available;
@@ -1049,6 +1148,7 @@
             if (Array.isArray(g.custom_methods)) {
                 g.custom_methods.forEach(cm => addCustomMethodUI(cm.name, cm.prices, cm.prices_usd));
             }
+            refreshPackageIconRows(g.package_icons || {});
 
             document.getElementById('saveGameBtn').innerHTML = "<i class='fas fa-pen'></i> تحديث المنتج";
             document.getElementById('cancelEditBtn').style.display = 'block';
@@ -1059,11 +1159,13 @@
             editingGameId = null;
             document.getElementById('saveGameBtn').innerHTML = "<i class='fas fa-cloud-upload-alt'></i> حفظ المنتج في السيستم";
             document.getElementById('cancelEditBtn').style.display = 'none';
-            ['gName','gImg','gIdPrices','gAccPrices','gIdPricesUsd','gAccPricesUsd','gImgFile']
+            ['gName','gImg','gIdPrices','gAccPrices','gIdPricesUsd','gAccPricesUsd','gImgFile','gExternalUrl','gPriceIcon','gPriceIconFile']
                 .forEach(id => { document.getElementById(id).value = ''; });
             document.getElementById('gOrder').value = '1';
             document.getElementById('gIdAvail').checked = false;
             document.getElementById('gAccAvail').checked = false;
+            document.getElementById('gKind').value = 'prices'; toggleExternalFields();
+            const packageRows = document.getElementById('packageIconRows'); if (packageRows) packageRows.innerHTML = '<div style="color:#64748b;font-size:.85rem">اكتب الأسعار أولاً ثم اضغط «تحديث قائمة الباقات».</div>';
             document.getElementById('customMethodsContainer').innerHTML = '';
         }
 
