@@ -986,7 +986,7 @@
                 </div>
                 <div class="cm-external-fields" style="display:${methodType==='external'?'block':'none'};padding:12px;border:1px dashed var(--primary);border-radius:12px;margin-bottom:12px;">
                     <label>رابط الصفحة:</label><input type="url" class="cm-url" value="${esc(savedUrl)}" placeholder="https://example.com">
-                    <p style="font-size:.8rem;color:#64748b;line-height:1.6;margin:6px 0 0;">ستفتح الصفحة داخل واجهة MOHAB STORE. الترميز يقلل ظهور الرابط كنص مباشر لكنه ليس تشفيراً أمنياً.</p>
+                    <p style="font-size:.8rem;color:#64748b;line-height:1.6;margin:6px 0 0;">ستفتح الصفحة داخل واجهة MOHAB STORE إذا كان الموقع يسمح بالتضمين. بعض المواقع تمنع ذلك؛ في هذه الحالة يلزم أن يدعم الموقع التضمين أو توفير صفحة وسيطة من الخادم.</p>
                 </div>
                 <div class="cm-price-fields" style="display:${methodType==='external'?'none':'block'}">
                     <div class="row">
@@ -1080,14 +1080,14 @@
                 else if (!finalPriceIcon && editingGameId && globalGames[editingGameId]) finalPriceIcon = globalGames[editingGameId].price_icon || '';
 
                 const kind = document.getElementById('gKind').value || 'prices';
-                const externalUrl = document.getElementById('gExternalUrl').value.trim();
+                const externalUrl = (document.getElementById('gExternalUrl').value || '').trim();
                 if (kind === 'external' && !/^https:\/\//i.test(externalUrl)) throw new Error('أدخل رابط صفحة صحيحاً يبدأ بـ https://');
 
                 const custom_methods = [];
                 document.querySelectorAll('.custom-method-item').forEach(item => {
                     const mName = item.querySelector('.cm-name').value.trim();
                     const methodType = item.querySelector('.cm-type')?.value || 'prices';
-                    const methodUrl = item.querySelector('.cm-url')?.value.trim() || '';
+                    const methodUrl = (item.querySelector('.cm-url')?.value || '').trim();
                     if (mName && methodType === 'external' && !/^https:\/\//i.test(methodUrl)) throw new Error('أدخل رابط https صحيحاً للطريقة: ' + mName);
                     if (mName) custom_methods.push({
                         name:mName,
