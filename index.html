@@ -965,26 +965,43 @@
             catch (e) { alert('تعذر حذف المنتج: ' + dbErrorMessage(e)); }
         }
 
-        function addCustomMethodUI(name = '', prices = '', pricesUsd = '') {
+        function addCustomMethodUI(name = '', prices = '', pricesUsd = '', methodData = {}) {
             const container = document.getElementById('customMethodsContainer');
             const div = document.createElement('div');
             div.className = 'custom-method-item';
-
-            const title = String(name).replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-            const egp = String(prices).replace(/</g,'&lt;').replace(/>/g,'&gt;');
-            const usd = String(pricesUsd).replace(/</g,'&lt;').replace(/>/g,'&gt;');
-
+            const esc = v => String(v || '').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+            const title = esc(name), egp = esc(prices), usd = esc(pricesUsd);
+            let savedUrl = methodData.external_url || '';
+            if (!savedUrl && methodData.external_url_b64) { try { savedUrl = decodeURIComponent(escape(atob(methodData.external_url_b64))); } catch (_) { try { savedUrl = atob(methodData.external_url_b64); } catch (_) {} } }
+            const methodType = methodData.type === 'external' ? 'external' : 'prices';
             div.innerHTML = `
-                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px;">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px;gap:8px;">
                     <label style="margin:0;font-size:1.1rem;color:var(--primary);">إعدادات الطريقة</label>
                     <button class="btn-small btn-red" type="button" onclick="this.parentElement.parentElement.remove()"><i class="fas fa-trash"></i> حذف</button>
                 </div>
-                <input type="text" class="cm-name" placeholder="اسم الطريقة (مثل: عن طريق رقم الموبايل)" value="${title}" style="margin-bottom:15px;">
-                <div class="row">
-                    <div><label>الأسعار (بالمصري):</label><textarea class="cm-prices" placeholder="مثال: باقة فليكس = 50 ج">${egp}</textarea></div>
-                    <div><label>الأسعار (بالدولار):</label><textarea class="cm-prices-usd">${usd}</textarea></div>
+                <input type="text" class="cm-name" placeholder="اسم الطريقة (مثلاً: شحن خاص أو عروض)" value="${title}" style="margin-bottom:12px;">
+                <div class="row" style="margin-bottom:12px;">
+                    <div><label>نوع الطريقة:</label><select class="cm-type" onchange="toggleCustomMethodFields(this)"><option value="prices" ${methodType==='prices'?'selected':''}>قائمة أسعار عادية</option><option value="external" ${methodType==='external'?'selected':''}>فتح صفحة داخل الموقع</option></select></div>
+                    <div><label>أيقونة الطريقة (رابط صورة اختياري):</label><input type="url" class="cm-icon" value="${esc(methodData.icon || '')}" placeholder="https://.../icon.png"></div>
+                </div>
+                <div class="cm-external-fields" style="display:${methodType==='external'?'block':'none'};padding:12px;border:1px dashed var(--primary);border-radius:12px;margin-bottom:12px;">
+                    <label>رابط الصفحة:</label><input type="url" class="cm-url" value="${esc(savedUrl)}" placeholder="https://example.com">
+                    <p style="font-size:.8rem;color:#64748b;line-height:1.6;margin:6px 0 0;">ستفتح الصفحة داخل واجهة MOHAB STORE. الترميز يقلل ظهور الرابط كنص مباشر لكنه ليس تشفيراً أمنياً.</p>
+                </div>
+                <div class="cm-price-fields" style="display:${methodType==='external'?'none':'block'}">
+                    <div class="row">
+                        <div><label>الأسعار (بالمصري):</label><textarea class="cm-prices" placeholder="مثال: باقة فليكس = 50 ج">${egp}</textarea></div>
+                        <div><label>الأسعار (بالدولار):</label><textarea class="cm-prices-usd">${usd}</textarea></div>
+                    </div>
                 </div>`;
             container.appendChild(div);
+        }
+
+        function toggleCustomMethodFields(select) {
+            const item = select.closest('.custom-method-item');
+            const external = select.value === 'external';
+            item.querySelector('.cm-external-fields').style.display = external ? 'block' : 'none';
+            item.querySelector('.cm-price-fields').style.display = external ? 'none' : 'block';
         }
 
         function getPackageNamesForIcons() {
@@ -1069,10 +1086,17 @@
                 const custom_methods = [];
                 document.querySelectorAll('.custom-method-item').forEach(item => {
                     const mName = item.querySelector('.cm-name').value.trim();
+                    const methodType = item.querySelector('.cm-type')?.value || 'prices';
+                    const methodUrl = item.querySelector('.cm-url')?.value.trim() || '';
+                    if (mName && methodType === 'external' && !/^https:\/\//i.test(methodUrl)) throw new Error('أدخل رابط https صحيحاً للطريقة: ' + mName);
                     if (mName) custom_methods.push({
                         name:mName,
-                        prices:item.querySelector('.cm-prices').value,
-                        prices_usd:item.querySelector('.cm-prices-usd').value
+                        type:methodType,
+                        icon:item.querySelector('.cm-icon')?.value.trim() || '',
+                        external_url_b64:methodType === 'external' ? btoa(unescape(encodeURIComponent(methodUrl))) : '',
+                        external_url:'',
+                        prices:methodType === 'prices' ? item.querySelector('.cm-prices').value : '',
+                        prices_usd:methodType === 'prices' ? item.querySelector('.cm-prices-usd').value : ''
                     });
                 });
 
@@ -1149,7 +1173,7 @@
 
             document.getElementById('customMethodsContainer').innerHTML = '';
             if (Array.isArray(g.custom_methods)) {
-                g.custom_methods.forEach(cm => addCustomMethodUI(cm.name, cm.prices, cm.prices_usd));
+                g.custom_methods.forEach(cm => addCustomMethodUI(cm.name, cm.prices, cm.prices_usd, cm));
             }
             refreshPackageIconRows(g.package_icons || {});
 
