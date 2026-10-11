@@ -748,7 +748,7 @@
                 const safeUrl = String(url).replace(/"/g, '&quot;');
                 const displayUrl = url.length > 100 ? 'صورة مرفوعة من المعرض' : url.replace(/</g,'&lt;').replace(/>/g,'&gt;');
                 html += `<div class="admin-card">
-                    <img src="${safeUrl}" style="height:60px;max-width:140px;object-fit:cover;border-radius:10px;background:#000;border:1px solid #cbd5e1;" onerror="this.src='https://via.placeholder.com/140x60?text=خطأ'">
+                    <img src="${safeUrl}" style="height:60px;max-width:140px;object-fit:contain;border-radius:10px;background:transparent;border:1px solid #cbd5e1;" onerror="this.src='https://via.placeholder.com/140x60?text=خطأ'">
                     <div style="flex:1;margin:0 15px;font-size:.85rem;color:var(--text-light);word-break:break-all;direction:ltr;text-align:left;">${displayUrl}</div>
                     <button class="btn-small btn-red" type="button" onclick="deleteBanner('${c.key}')"><i class="fas fa-trash"></i> حذف</button>
                 </div>`;
@@ -1019,7 +1019,7 @@
                 const safeName = name.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
                 const value = icons[name] || '';
                 const valueForInput = value.length < 200 ? value.replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;') : '';
-                const preview = value ? `<img src="${value}" alt="" style="width:36px;height:36px;object-fit:contain;border-radius:8px;background-color:#f8fafc;background-image:linear-gradient(45deg,#e2e8f0 25%,transparent 25%),linear-gradient(-45deg,#e2e8f0 25%,transparent 25%),linear-gradient(45deg,transparent 75%,#e2e8f0 75%),linear-gradient(-45deg,transparent 75%,#e2e8f0 75%);background-size:8px 8px;background-position:0 0,0 4px,4px -4px,-4px 0" onerror="this.style.display='none'">` : '';
+                const preview = value ? `<img src="${value}" alt="" style="width:36px;height:36px;object-fit:contain;border-radius:8px;background-color:transparent;background-image:none;background-size:auto;background-position:initial" onerror="this.style.display='none'">` : '';
                 return `<div class="package-icon-row" data-pack-name="${safeName}" style="display:grid;grid-template-columns:minmax(70px,.8fr) minmax(100px,1.4fr) auto;align-items:center;gap:8px;padding:10px 0;border-bottom:1px solid #e2e8f0">
                     <div style="font-weight:700;color:#0f172a;font-size:.88rem;overflow-wrap:anywhere">${safeName}</div>
                     <div style="display:flex;flex-direction:column;gap:6px"><input class="package-icon-url" type="url" value="${valueForInput}" placeholder="رابط صورة لهذه الباقة" style="width:100%;box-sizing:border-box"><label style="font-size:.78rem;color:#475569">أو اختر من المعرض <input class="package-icon-file" type="file" accept="image/*" style="display:block;width:100%;font-size:.76rem;margin-top:4px"></label><label style="font-size:.75rem;color:#64748b"><input type="checkbox" class="package-icon-clear"> حذف الأيقونة الخاصة والرجوع للصورة العامة</label></div>
