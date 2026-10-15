@@ -616,7 +616,12 @@
                     <span id="walletPendingCount" class="badge" style="background:#fef3c7;color:#92400e;">0 طلب</span>
                 </div>
                 <p style="font-size:.88rem;color:var(--text-light);line-height:1.8;">راجع بيانات التحويل وإيصال الدفع قبل الموافقة. الموافقة تضيف المبلغ إلى رصيد المستخدم بالدولار، ويُمنع تكرار إضافة نفس طلب الإيداع.</p>
-                <div style="display:flex;justify-content:flex-end;margin-top:12px"><button class="btn-small" type="button" onclick="refreshWalletDeposits()"><i class="fas fa-rotate"></i> تحديث الطلبات الآن</button></div><div id="walletDepositsList" style="margin-top:16px;"><div class="request-empty">جاري تحميل طلبات الإيداع…</div></div>
+                <div class="row" style="margin-top:12px;align-items:center;">
+                    <div style="flex:2;min-width:180px"><input id="walletDepositSearch" type="search" placeholder="بحث بكود الطلب أو البريد أو UID أو رقم التحويل" oninput="renderWalletDepositsFromCache()"></div>
+                    <div style="min-width:150px"><select id="walletDepositStatusFilter" onchange="renderWalletDepositsFromCache()"><option value="all">كل الحالات</option><option value="pending">معلقة</option><option value="approved">مقبولة</option><option value="rejected">مرفوضة</option><option value="upload_failed">فشل الإرسال</option></select></div>
+                    <div><button class="btn-small" type="button" onclick="refreshWalletDeposits()"><i class="fas fa-rotate"></i> تحديث الآن</button></div>
+                    <div><button class="btn-small" type="button" onclick="exportWalletDepositsCsv()"><i class="fas fa-file-csv"></i> تصدير CSV</button></div>
+                </div><div id="walletDepositDiagnostics" class="wallet-admin-stat" style="margin-top:10px">بانتظار الاتصال بقاعدة البيانات…</div><div id="walletDepositsList" style="margin-top:16px;"><div class="request-empty">جاري تحميل طلبات الإيداع…</div></div>
             </div>
 
             <div class="form-section" style="border-top:4px solid #0ea5e9;">
@@ -1497,16 +1502,32 @@
             } catch (e) { alert('تعذر حفظ سعر الصرف: ' + dbErrorMessage(e)); }
             finally { btn.disabled = false; btn.innerHTML = '<i class="fas fa-save"></i> حفظ سعر الصرف'; }
         }
+        let walletDepositsCache = {};
         function renderWalletDeposits(snap) {
+            walletDepositsCache = {};
+            snap.forEach(child => { walletDepositsCache[child.key] = child.val() || {}; });
+            const diag = document.getElementById('walletDepositDiagnostics');
+            if (diag) diag.textContent = `اتصال قاعدة البيانات يعمل — إجمالي السجلات المقروءة: ${Object.keys(walletDepositsCache).length}. يتم عرض الطلبات الجديدة فور حفظها في wallet_deposits.`;
+            renderWalletDepositsFromCache();
+        }
+        function renderWalletDepositsFromCache() {
             const list = document.getElementById('walletDepositsList');
             if (!list) return;
-            const arr = [];
-            snap.forEach(child => arr.push({key:child.key, ...(child.val() || {})}));
+            const query = (document.getElementById('walletDepositSearch')?.value || '').trim().toLowerCase();
+            const filter = document.getElementById('walletDepositStatusFilter')?.value || 'all';
+            const arr = Object.entries(walletDepositsCache).map(([key, value]) => ({key, ...(value || {})}));
             arr.sort((a,b) => Number(b.createdAt || 0) - Number(a.createdAt || 0));
             const pending = arr.filter(d => (d.status || 'pending') === 'pending').length;
-            document.getElementById('walletPendingCount').textContent = pending + ' طلب معلق';
-            if (!arr.length) { list.innerHTML = '<div class="request-empty">لا توجد طلبات إيداع حتى الآن.</div>'; return; }
-            list.innerHTML = arr.map(d => {
+            const badge = document.getElementById('walletPendingCount'); if (badge) badge.textContent = pending + ' طلب معلق';
+            const shown = arr.filter(d => {
+                const status = d.status || 'pending';
+                if (filter !== 'all' && status !== filter) return false;
+                const haystack = [d.code,d.key,d.requestId,d.email,d.displayName,d.uid,d.sender,d.transactionReference,d.methodName,d.method].join(' ').toLowerCase();
+                return !query || haystack.includes(query);
+            });
+            if (!arr.length) { list.innerHTML = '<div class="request-empty">لا توجد سجلات في wallet_deposits. إذا أرسلت طلبًا ولم يظهر هنا، فتحقق من نجاح كتابته في قاعدة Firebase ومن قواعد الكتابة.</div>'; return; }
+            if (!shown.length) { list.innerHTML = '<div class="request-empty">لا توجد طلبات مطابقة للبحث أو الحالة المختارة.</div>'; return; }
+            list.innerHTML = shown.map(d => {
                 const key = walletAdminEscape(d.key), code = walletAdminEscape(d.code || d.key);
                 const email = walletAdminEscape(d.email || 'بدون بريد'), name = walletAdminEscape(d.displayName || 'مستخدم');
                 const sender = walletAdminEscape(d.sender || 'غير مسجل'), method = walletAdminEscape(d.methodName || d.method || 'غير محدد');
@@ -1521,15 +1542,26 @@
                 const date = walletAdminEscape(walletAdminDate(d.createdAt));
                 const receipt = d.receiptDataUrl ? `<a class="wallet-admin-receipt" href="${d.receiptDataUrl}" target="_blank" rel="noopener noreferrer"><i class="fas fa-image"></i> فتح إيصال التحويل</a>` : (d.receiptUrl ? `<a class="wallet-admin-receipt" href="${walletAdminEscape(d.receiptUrl)}" target="_blank" rel="noopener noreferrer"><i class="fas fa-image"></i> فتح إيصال التحويل</a>` : '<div class="wallet-admin-meta">لا يوجد إيصال مرفق.</div>');
                 const status = d.status || 'pending';
-                const actions = status === 'pending'
-                    ? `<div class="wallet-admin-actions"><button class="btn-small btn-green" type="button" onclick="approveWalletDeposit('${key}')"><i class="fas fa-check"></i> موافقة وإضافة الرصيد</button><button class="btn-small btn-red" type="button" onclick="rejectWalletDeposit('${key}')"><i class="fas fa-times"></i> رفض الطلب</button></div>` : '';
-                return `<div class="admin-card wallet-admin-card"><div class="wallet-admin-card-top"><div><div class="wallet-admin-code">${code}</div><strong>${name}</strong><div class="wallet-admin-meta">${email}</div></div><div>${walletDepositStatus(status)}</div></div>
-                    <div class="wallet-admin-meta" style="margin-top:12px"><div><strong>المبلغ المرسل:</strong> ${amount} — <strong>المضاف للمحفظة:</strong> ${amountUsd}</div>
-                    <div><strong>طريقة التحويل:</strong> ${method} | <strong>رقم/معرّف المحوّل:</strong> ${sender}</div><div><strong>رقم الاستلام:</strong> ${target}</div>
-                    <div><strong>هاتف الحساب:</strong> ${userPhone} | <strong>رقم العملية:</strong> ${transactionReference}</div>
-                    <div><strong>سعر الصرف وقت الطلب:</strong> ${fxRate} ج.م لكل دولار | <strong>اسم الإيصال:</strong> ${receiptName}</div>
-                    <div><strong>UID:</strong> <span style="direction:ltr;display:inline-block;word-break:break-all">${walletAdminEscape(d.uid || '')}</span></div><div><strong>معرّف الطلب:</strong> <span style="direction:ltr;display:inline-block;word-break:break-all">${walletAdminEscape(d.requestId || d.key || '')}</span></div><div><strong>التاريخ:</strong> ${date}</div>${errorDetails ? `<div style="color:#fca5a5;margin-top:6px"><strong>تفاصيل الخطأ:</strong> ${errorDetails}</div>` : ''}${receipt}</div>${actions}</div>`;
+                const actions = status === 'pending' ? `<div class="wallet-admin-actions"><button class="btn-small btn-green" type="button" onclick="approveWalletDeposit('${key}')"><i class="fas fa-check"></i> موافقة وإضافة الرصيد</button><button class="btn-small btn-red" type="button" onclick="rejectWalletDeposit('${key}')"><i class="fas fa-times"></i> رفض الطلب</button></div>` : `<div class="wallet-admin-actions">${status === 'upload_failed' ? `<button class="btn-small btn-green" type="button" onclick="markWalletDepositPending('${key}')">إعادة للمراجعة</button>` : ''}<button class="btn-small btn-red" type="button" onclick="deleteWalletDeposit('${key}')"><i class="fas fa-trash"></i> حذف السجل</button></div>`;
+                return `<div class="admin-card wallet-admin-card"><div class="wallet-admin-card-top"><div><div class="wallet-admin-code">${code}</div><strong>${name}</strong><div class="wallet-admin-meta">${email}</div></div><div>${walletDepositStatus(status)}</div></div><div class="wallet-admin-meta" style="margin-top:12px"><div><strong>المبلغ المرسل:</strong> ${amount} — <strong>المضاف للمحفظة:</strong> ${amountUsd}</div><div><strong>طريقة التحويل:</strong> ${method} | <strong>رقم/معرّف المحوّل:</strong> ${sender}</div><div><strong>رقم الاستلام:</strong> ${target}</div><div><strong>هاتف الحساب:</strong> ${userPhone} | <strong>رقم العملية:</strong> ${transactionReference}</div><div><strong>سعر الصرف وقت الطلب:</strong> ${fxRate} ج.م لكل دولار | <strong>اسم الإيصال:</strong> ${receiptName}</div><div><strong>UID:</strong> <span style="direction:ltr;display:inline-block;word-break:break-all">${walletAdminEscape(d.uid || '')}</span></div><div><strong>معرّف الطلب:</strong> <span style="direction:ltr;display:inline-block;word-break:break-all">${walletAdminEscape(d.requestId || d.key || '')}</span></div><div><strong>التاريخ:</strong> ${date}</div>${errorDetails ? `<div style="color:#fca5a5;margin-top:6px"><strong>تفاصيل الخطأ:</strong> ${errorDetails}</div>` : ''}${receipt}</div>${actions}</div>`;
             }).join('');
+        }
+        async function markWalletDepositPending(key) {
+            if (!isAdminReady() || !key) return;
+            try { await db.ref('wallet_deposits/' + key).update({status:'pending', uploadError:null, requeuedAt:firebase.database.ServerValue.TIMESTAMP}); alert('أُعيد الطلب إلى قائمة المراجعة.'); }
+            catch(e) { alert('تعذر تحديث الطلب: ' + dbErrorMessage(e)); }
+        }
+        async function deleteWalletDeposit(key) {
+            if (!isAdminReady() || !key || !confirm('حذف سجل الطلب نهائيًا؟ هذا لا يغيّر أي رصيد سبق إضافته.')) return;
+            try { await db.ref('wallet_deposits/' + key).remove(); alert('تم حذف السجل.'); }
+            catch(e) { alert('تعذر حذف السجل: ' + dbErrorMessage(e)); }
+        }
+        function exportWalletDepositsCsv() {
+            const rows = Object.entries(walletDepositsCache).map(([key,d]) => ({key, ...d}));
+            if (!rows.length) return alert('لا توجد سجلات لتصديرها.');
+            const cols = ['key','code','status','displayName','email','uid','amount','currency','amountUsd','methodName','sender','transactionReference','createdAt','uploadError'];
+            const csv = '\uFEFF' + [cols.join(','), ...rows.map(r => cols.map(c => '"' + String(r[c] ?? '').replace(/"/g,'""') + '"').join(','))].join('\r\n');
+            const url = URL.createObjectURL(new Blob([csv], {type:'text/csv;charset=utf-8;'})); const a=document.createElement('a'); a.href=url; a.download='mohab-wallet-deposits.csv'; a.click(); URL.revokeObjectURL(url);
         }
         async function approveWalletDeposit(key) {
             if (!isAdminReady()) return alert('يجب تسجيل الدخول أولاً.');
