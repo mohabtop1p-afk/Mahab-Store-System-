@@ -1519,7 +1519,7 @@
                 const amount = walletAdminEscape(walletAdminMoney(d.amount, d.currency === 'USD' ? 'USD' : 'EGP'));
                 const amountUsd = walletAdminEscape(walletAdminMoney(d.amountUsd, 'USD'));
                 const date = walletAdminEscape(walletAdminDate(d.createdAt));
-                const receipt = d.receiptUrl ? `<a class="wallet-admin-receipt" href="${walletAdminEscape(d.receiptUrl)}" target="_blank" rel="noopener noreferrer"><i class="fas fa-image"></i> فتح إيصال التحويل</a>` : '<div class="wallet-admin-meta">لا يوجد رابط إيصال مرفق.</div>';
+                const receipt = d.receiptDataUrl ? `<a class="wallet-admin-receipt" href="${d.receiptDataUrl}" target="_blank" rel="noopener noreferrer"><i class="fas fa-image"></i> فتح إيصال التحويل</a>` : (d.receiptUrl ? `<a class="wallet-admin-receipt" href="${walletAdminEscape(d.receiptUrl)}" target="_blank" rel="noopener noreferrer"><i class="fas fa-image"></i> فتح إيصال التحويل</a>` : '<div class="wallet-admin-meta">لا يوجد إيصال مرفق.</div>');
                 const status = d.status || 'pending';
                 const actions = status === 'pending'
                     ? `<div class="wallet-admin-actions"><button class="btn-small btn-green" type="button" onclick="approveWalletDeposit('${key}')"><i class="fas fa-check"></i> موافقة وإضافة الرصيد</button><button class="btn-small btn-red" type="button" onclick="rejectWalletDeposit('${key}')"><i class="fas fa-times"></i> رفض الطلب</button></div>` : '';
