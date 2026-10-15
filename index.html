@@ -616,7 +616,7 @@
                     <span id="walletPendingCount" class="badge" style="background:#fef3c7;color:#92400e;">0 طلب</span>
                 </div>
                 <p style="font-size:.88rem;color:var(--text-light);line-height:1.8;">راجع بيانات التحويل وإيصال الدفع قبل الموافقة. الموافقة تضيف المبلغ إلى رصيد المستخدم بالدولار، ويُمنع تكرار إضافة نفس طلب الإيداع.</p>
-                <div id="walletDepositsList" style="margin-top:16px;"><div class="request-empty">جاري تحميل طلبات الإيداع…</div></div>
+                <div style="display:flex;justify-content:flex-end;margin-top:12px"><button class="btn-small" type="button" onclick="refreshWalletDeposits()"><i class="fas fa-rotate"></i> تحديث الطلبات الآن</button></div><div id="walletDepositsList" style="margin-top:16px;"><div class="request-empty">جاري تحميل طلبات الإيداع…</div></div>
             </div>
 
             <div class="form-section" style="border-top:4px solid #0ea5e9;">
@@ -1591,6 +1591,18 @@
                 <div><strong>طريقة الشحن:</strong> ${walletAdminEscape(o.method || 'غير محدد')} | <strong>التاريخ:</strong> ${walletAdminEscape(walletAdminDate(o.createdAt))}</div><div><strong>UID:</strong> <span style="direction:ltr;display:inline-block;word-break:break-all">${walletAdminEscape(o.uid || '')}</span></div></div></div>`;
             }).join('');
         }
+        async function refreshWalletDeposits() {
+            const list = document.getElementById('walletDepositsList');
+            if (!isAdminReady()) { if (list) list.innerHTML = '<div class="request-empty">سجّل الدخول بحساب الإدارة أولًا.</div>'; return; }
+            if (list) list.innerHTML = '<div class="request-empty">جاري تحديث طلبات الإيداع…</div>';
+            try {
+                const snap = await db.ref('wallet_deposits').once('value');
+                renderWalletDeposits(snap);
+            } catch (e) {
+                if (list) list.innerHTML = '<div class="request-empty" style="color:#fca5a5">فشل تحديث الطلبات: ' + walletAdminEscape(dbErrorMessage(e)) + '<br>راجع قواعد Realtime Database ومشروع Firebase المستخدم في الملفين.</div>';
+            }
+        }
+
         function refreshWalletOrders() {
             if (!isAdminReady()) return alert('يجب تسجيل الدخول أولاً.');
             db.ref('wallet_orders').once('value').then(renderWalletOrders).catch(e => {
@@ -1605,7 +1617,10 @@
             safeListener(db.ref('wallet_settings/usdToEgp'), snap => {
                 if (snap.exists()) document.getElementById('walletUsdToEgp').value = Number(snap.val()) || '';
             });
-            safeListener(db.ref('wallet_deposits'), renderWalletDeposits);
+            safeListener(db.ref('wallet_deposits'), renderWalletDeposits, error => {
+                const list = document.getElementById('walletDepositsList');
+                if (list) list.innerHTML = '<div class="request-empty" style="color:#fca5a5">تعذر تحميل طلبات الإيداع من قاعدة البيانات: ' + walletAdminEscape(dbErrorMessage(error)) + '<br>تأكد من صلاحيات قراءة wallet_deposits وأن الموقع والسيستم يستخدمان نفس مشروع Firebase.</div>';
+            });
             safeListener(db.ref('wallet_orders'), renderWalletOrders);
 
             const logoRef = db.ref('settings/general/logo');
