@@ -266,6 +266,23 @@
         .admin-user-bar button{border:0;background:#fee2e2;color:#b91c1c;border-radius:8px;padding:7px 9px;cursor:pointer;font-family:inherit;font-weight:700}
         @media(max-width:768px){.admin-user-bar{top:8px;left:8px}.admin-user-bar span{display:none}}
 
+
+        /* ===== إدارة المحفظة والإيداعات ===== */
+        .wallet-admin-stat{background:#f0f9ff;border:1px solid #bae6fd;border-radius:14px;padding:15px;line-height:1.8}
+        .wallet-admin-meta{font-size:.88rem;color:#64748b;line-height:1.8;overflow-wrap:anywhere}
+        .wallet-admin-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+        .wallet-admin-actions a{display:inline-flex;align-items:center;gap:7px;text-decoration:none}
+        .wallet-admin-receipt{display:inline-block;color:#0284c7;font-weight:800;margin-top:8px}
+        .wallet-admin-status{display:inline-block;border-radius:8px;padding:5px 10px;font-size:.82rem;font-weight:800}
+        .wallet-status-pending{background:#fef3c7;color:#92400e}
+        .wallet-status-approved{background:#d1fae5;color:#065f46}
+        .wallet-status-rejected{background:#fee2e2;color:#991b1b}
+        .wallet-admin-card{display:block}
+        .wallet-admin-card-top{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap}
+        .wallet-admin-code{font-family:monospace;color:#0284c7;font-weight:900;overflow-wrap:anywhere}
+        .wallet-admin-card .btn-group{flex-wrap:wrap}
+        @media(max-width:600px){.wallet-admin-actions .btn-small{flex:1}.wallet-admin-card{padding:14px}}
+
     </style>
 </head>
 <body>
@@ -293,6 +310,7 @@
         <button class="tab-btn" onclick="openTab('tab-games', this)"><i class="fas fa-gamepad"></i> المنتجات</button>
         <button class="tab-btn" onclick="openTab('tab-requests', this)"><i class="fas fa-comments"></i> طلبات الألعاب</button>
         <button class="tab-btn" onclick="openTab('tab-discounts', this)" style="color:#f59e0b;"><i class="fas fa-bolt"></i> الخصومات</button>
+        <button class="tab-btn" onclick="openTab('tab-wallet', this)" style="color:#0d9488;"><i class="fas fa-wallet"></i> المحفظة</button>
     </div>
 
     <div class="admin-container">
@@ -401,7 +419,7 @@
             <div class="form-section" style="border-top: 4px solid var(--primary);">
                 <div class="row">
                     <div style="flex:2;"><label>اسم العنصر:</label><input type="text" id="gName" placeholder="اسم اللعبة أو الموقع الخارجي"></div>
-                    <div><label>نوع العنصر:</label><select id="gKind" onchange="toggleExternalFields()"><option value="prices">قائمة أسعار / شحن</option><option value="external">صفحة خارجية تفتح داخل الموقع</option></select></div>
+                    <div><label>نوع العنصر:</label><select id="gKind" onchange="toggleExternalFields()"><option value="prices">قائمة أسعار / شحن</option><option value="external">رابط موقع خارجي</option></select></div>
                     <div><label>الترتيب:</label><input type="number" id="gOrder" value="1"></div>
                 </div>
                 
@@ -412,7 +430,7 @@
                 </div>
                 
                 <div id="externalFields" style="display:none;padding:16px;margin-bottom:18px;border:1px dashed var(--primary);border-radius:14px;background:#f0f9ff;">
-                    <label>رابط الصفحة الخارجية (يبدأ بـ https://):</label>
+                    <label>رابط الموقع الخارجي (يبدأ بـ https://):</label>
                     <input type="url" id="gExternalUrl" placeholder="https://example.com">
                     <p style="font-size:.8rem;color:#64748b;line-height:1.7;margin-top:8px">سيظهر كعنصر مستقل في شبكة الموقع. يمكن إخفاء الرابط من الواجهة، لكن الترميز ليس تشفيراً أمنياً ولا يخفيه عن أدوات المطور.</p>
                 </div>
@@ -579,6 +597,38 @@
 
         </div>
 
+        <!-- التبويب 5: المحفظة والإيداعات -->
+        <div id="tab-wallet" class="tab-content">
+            <h2>إدارة المحفظة <i class="fas fa-wallet" style="color:#0d9488;"></i></h2>
+            <div class="form-section" style="border-top:4px solid #0d9488;">
+                <h3><i class="fas fa-coins" style="color:#0d9488;"></i> إعدادات العملة وسعر الصرف</h3>
+                <p style="color:var(--text-light);line-height:1.8;font-size:.9rem;">رصيد المحفظة يُحفظ بالدولار داخلياً. أدخل قيمة الجنيه المصري مقابل 1 دولار؛ وسيستخدمها الموقع لحساب التحويل بين EGP وUSD.</p>
+                <div class="row">
+                    <div><label>سعر الدولار بالجنيه المصري (1 USD = EGP):</label><input type="number" id="walletUsdToEgp" min="0.01" step="0.01" placeholder="مثال: 50.00"></div>
+                    <div><button class="action-btn" id="saveWalletSettingsBtn" onclick="saveWalletSettings()"><i class="fas fa-save"></i> حفظ سعر الصرف</button></div>
+                </div>
+                <div class="wallet-admin-stat"><i class="fas fa-info-circle"></i> تعديل سعر الصرف يؤثر على عرض الرصيد وتحويلات الإيداع والشراء الجديدة، ولا يغيّر الأرصدة المحفوظة بالدولار.</div>
+            </div>
+
+            <div class="form-section" style="border-top:4px solid #f59e0b;">
+                <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+                    <h3 style="margin:0;"><i class="fas fa-hourglass-half" style="color:#d97706;"></i> طلبات الإيداع المعلقة</h3>
+                    <span id="walletPendingCount" class="badge" style="background:#fef3c7;color:#92400e;">0 طلب</span>
+                </div>
+                <p style="font-size:.88rem;color:var(--text-light);line-height:1.8;">راجع بيانات التحويل وإيصال الدفع قبل الموافقة. الموافقة تضيف المبلغ إلى رصيد المستخدم بالدولار، ويُمنع تكرار إضافة نفس طلب الإيداع.</p>
+                <div id="walletDepositsList" style="margin-top:16px;"><div class="request-empty">جاري تحميل طلبات الإيداع…</div></div>
+            </div>
+
+            <div class="form-section" style="border-top:4px solid #0ea5e9;">
+                <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+                    <h3 style="margin:0;"><i class="fas fa-receipt" style="color:#0284c7;"></i> عمليات الشراء من رصيد المحفظة</h3>
+                    <button type="button" class="btn-small" style="background:#0284c7;" onclick="refreshWalletOrders()"><i class="fas fa-sync-alt"></i> تحديث</button>
+                </div>
+                <p style="font-size:.88rem;color:var(--text-light);line-height:1.8;">تظهر هنا الطلبات التي تم تسجيلها من صفحة الموقع، مع كود الدفع الذي يمكن مراجعته عند التواصل مع العميل.</p>
+                <div id="walletOrdersList" style="margin-top:16px;"><div class="request-empty">جاري تحميل عمليات الشراء…</div></div>
+            </div>
+        </div>
+
     </div>
     </div>
 
@@ -685,12 +735,12 @@
                         }
                         canvas.width = width; canvas.height = height;
                         ctx.drawImage(img, 0, 0, width, height);
-                        // JPEG لا يدعم الشفافية؛ نحافظ على قناة alpha بصيغة PNG للصور غير JPEG.
-                        // صور JPEG فقط تُضغط بصيغة JPEG، أما PNG/WebP/GIF وغيرها فتُحفظ PNG حتى لا تتحول الشفافية إلى خلفية.
-                        const preserveAlpha = file.type !== 'image/jpeg' && file.type !== 'image/jpg';
-                        let result = preserveAlpha ? canvas.toDataURL('image/png') : canvas.toDataURL('image/jpeg', 0.78);
-                        // محاولة تخفيف صور JPEG الكبيرة مع الحفاظ على الصور الشفافة كما هي.
-                        if (!preserveAlpha && result.length > 1400000) result = canvas.toDataURL('image/jpeg', 0.58);
+                        // جودة أخف حتى لا تتحول صور الإعدادات إلى بيانات ضخمة داخل RTDB.
+                        let result = canvas.toDataURL('image/jpeg', 0.68);
+                        // نمنع حفظ صورة ضخمة قد تؤدي إلى بطء/فشل الكتابة، ولا نلمس أي بيانات قديمة.
+                        if (result.length > 1400000) {
+                            result = canvas.toDataURL('image/jpeg', 0.52);
+                        }
                         if (result.length > 1800000) {
                             reject(new Error('الصورة كبيرة جداً بعد الضغط. اختر صورة أصغر أو استخدم رابط صورة مباشر.'));
                             return;
@@ -748,7 +798,7 @@
                 const safeUrl = String(url).replace(/"/g, '&quot;');
                 const displayUrl = url.length > 100 ? 'صورة مرفوعة من المعرض' : url.replace(/</g,'&lt;').replace(/>/g,'&gt;');
                 html += `<div class="admin-card">
-                    <img src="${safeUrl}" style="height:60px;max-width:140px;object-fit:contain;border-radius:10px;background:transparent;border:1px solid #cbd5e1;" onerror="this.src='https://via.placeholder.com/140x60?text=خطأ'">
+                    <img src="${safeUrl}" style="height:60px;max-width:140px;object-fit:cover;border-radius:10px;background:#000;border:1px solid #cbd5e1;" onerror="this.src='https://via.placeholder.com/140x60?text=خطأ'">
                     <div style="flex:1;margin:0 15px;font-size:.85rem;color:var(--text-light);word-break:break-all;direction:ltr;text-align:left;">${displayUrl}</div>
                     <button class="btn-small btn-red" type="button" onclick="deleteBanner('${c.key}')"><i class="fas fa-trash"></i> حذف</button>
                 </div>`;
@@ -965,43 +1015,26 @@
             catch (e) { alert('تعذر حذف المنتج: ' + dbErrorMessage(e)); }
         }
 
-        function addCustomMethodUI(name = '', prices = '', pricesUsd = '', methodData = {}) {
+        function addCustomMethodUI(name = '', prices = '', pricesUsd = '') {
             const container = document.getElementById('customMethodsContainer');
             const div = document.createElement('div');
             div.className = 'custom-method-item';
-            const esc = v => String(v || '').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-            const title = esc(name), egp = esc(prices), usd = esc(pricesUsd);
-            let savedUrl = methodData.external_url || '';
-            if (!savedUrl && methodData.external_url_b64) { try { savedUrl = decodeURIComponent(escape(atob(methodData.external_url_b64))); } catch (_) { try { savedUrl = atob(methodData.external_url_b64); } catch (_) {} } }
-            const methodType = methodData.type === 'external' ? 'external' : 'prices';
+
+            const title = String(name).replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+            const egp = String(prices).replace(/</g,'&lt;').replace(/>/g,'&gt;');
+            const usd = String(pricesUsd).replace(/</g,'&lt;').replace(/>/g,'&gt;');
+
             div.innerHTML = `
-                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px;gap:8px;">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px;">
                     <label style="margin:0;font-size:1.1rem;color:var(--primary);">إعدادات الطريقة</label>
                     <button class="btn-small btn-red" type="button" onclick="this.parentElement.parentElement.remove()"><i class="fas fa-trash"></i> حذف</button>
                 </div>
-                <input type="text" class="cm-name" placeholder="اسم الطريقة (مثلاً: شحن خاص أو عروض)" value="${title}" style="margin-bottom:12px;">
-                <div class="row" style="margin-bottom:12px;">
-                    <div><label>نوع الطريقة:</label><select class="cm-type" onchange="toggleCustomMethodFields(this)"><option value="prices" ${methodType==='prices'?'selected':''}>قائمة أسعار عادية</option><option value="external" ${methodType==='external'?'selected':''}>فتح صفحة داخل الموقع</option></select></div>
-                    <div><label>أيقونة الطريقة (رابط صورة اختياري):</label><input type="url" class="cm-icon" value="${esc(methodData.icon || '')}" placeholder="https://.../icon.png"></div>
-                </div>
-                <div class="cm-external-fields" style="display:${methodType==='external'?'block':'none'};padding:12px;border:1px dashed var(--primary);border-radius:12px;margin-bottom:12px;">
-                    <label>رابط الصفحة:</label><input type="url" class="cm-url" value="${esc(savedUrl)}" placeholder="https://example.com">
-                    <p style="font-size:.8rem;color:#64748b;line-height:1.6;margin:6px 0 0;">ستفتح الصفحة داخل واجهة MOHAB STORE إذا كان الموقع يسمح بالتضمين. بعض المواقع تمنع ذلك؛ في هذه الحالة يلزم أن يدعم الموقع التضمين أو توفير صفحة وسيطة من الخادم.</p>
-                </div>
-                <div class="cm-price-fields" style="display:${methodType==='external'?'none':'block'}">
-                    <div class="row">
-                        <div><label>الأسعار (بالمصري):</label><textarea class="cm-prices" placeholder="مثال: باقة فليكس = 50 ج">${egp}</textarea></div>
-                        <div><label>الأسعار (بالدولار):</label><textarea class="cm-prices-usd">${usd}</textarea></div>
-                    </div>
+                <input type="text" class="cm-name" placeholder="اسم الطريقة (مثل: عن طريق رقم الموبايل)" value="${title}" style="margin-bottom:15px;">
+                <div class="row">
+                    <div><label>الأسعار (بالمصري):</label><textarea class="cm-prices" placeholder="مثال: باقة فليكس = 50 ج">${egp}</textarea></div>
+                    <div><label>الأسعار (بالدولار):</label><textarea class="cm-prices-usd">${usd}</textarea></div>
                 </div>`;
             container.appendChild(div);
-        }
-
-        function toggleCustomMethodFields(select) {
-            const item = select.closest('.custom-method-item');
-            const external = select.value === 'external';
-            item.querySelector('.cm-external-fields').style.display = external ? 'block' : 'none';
-            item.querySelector('.cm-price-fields').style.display = external ? 'none' : 'block';
         }
 
         function getPackageNamesForIcons() {
@@ -1036,7 +1069,7 @@
                 const safeName = name.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
                 const value = icons[name] || '';
                 const valueForInput = value.length < 200 ? value.replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;') : '';
-                const preview = value ? `<img src="${value}" alt="" style="width:36px;height:36px;object-fit:contain;border-radius:8px;background-color:transparent;background-image:none;background-size:auto;background-position:initial" onerror="this.style.display='none'">` : '';
+                const preview = value ? `<img src="${value}" alt="" style="width:36px;height:36px;object-fit:contain;border-radius:8px;background:#e2e8f0;padding:3px" onerror="this.style.display='none'">` : '';
                 return `<div class="package-icon-row" data-pack-name="${safeName}" style="display:grid;grid-template-columns:minmax(70px,.8fr) minmax(100px,1.4fr) auto;align-items:center;gap:8px;padding:10px 0;border-bottom:1px solid #e2e8f0">
                     <div style="font-weight:700;color:#0f172a;font-size:.88rem;overflow-wrap:anywhere">${safeName}</div>
                     <div style="display:flex;flex-direction:column;gap:6px"><input class="package-icon-url" type="url" value="${valueForInput}" placeholder="رابط صورة لهذه الباقة" style="width:100%;box-sizing:border-box"><label style="font-size:.78rem;color:#475569">أو اختر من المعرض <input class="package-icon-file" type="file" accept="image/*" style="display:block;width:100%;font-size:.76rem;margin-top:4px"></label><label style="font-size:.75rem;color:#64748b"><input type="checkbox" class="package-icon-clear"> حذف الأيقونة الخاصة والرجوع للصورة العامة</label></div>
@@ -1080,23 +1113,16 @@
                 else if (!finalPriceIcon && editingGameId && globalGames[editingGameId]) finalPriceIcon = globalGames[editingGameId].price_icon || '';
 
                 const kind = document.getElementById('gKind').value || 'prices';
-                const externalUrl = (document.getElementById('gExternalUrl').value || '').trim();
-                if (kind === 'external' && !/^https:\/\//i.test(externalUrl)) throw new Error('أدخل رابط صفحة صحيحاً يبدأ بـ https://');
+                const externalUrl = document.getElementById('gExternalUrl').value.trim();
+                if (kind === 'external' && !/^https:\/\//i.test(externalUrl)) throw new Error('أدخل رابطاً صحيحاً يبدأ بـ https://');
 
                 const custom_methods = [];
                 document.querySelectorAll('.custom-method-item').forEach(item => {
                     const mName = item.querySelector('.cm-name').value.trim();
-                    const methodType = item.querySelector('.cm-type')?.value || 'prices';
-                    const methodUrl = (item.querySelector('.cm-url')?.value || '').trim();
-                    if (mName && methodType === 'external' && !/^https:\/\//i.test(methodUrl)) throw new Error('أدخل رابط https صحيحاً للطريقة: ' + mName);
                     if (mName) custom_methods.push({
                         name:mName,
-                        type:methodType,
-                        icon:item.querySelector('.cm-icon')?.value.trim() || '',
-                        external_url_b64:methodType === 'external' ? btoa(unescape(encodeURIComponent(methodUrl))) : '',
-                        external_url:'',
-                        prices:methodType === 'prices' ? item.querySelector('.cm-prices').value : '',
-                        prices_usd:methodType === 'prices' ? item.querySelector('.cm-prices-usd').value : ''
+                        prices:item.querySelector('.cm-prices').value,
+                        prices_usd:item.querySelector('.cm-prices-usd').value
                     });
                 });
 
@@ -1116,9 +1142,8 @@
                     name,
                     img:finalImgUrl,
                     kind,
-                    // نحفظ الرابط الخارجي بصيغة Base64 فقط لتقليل ظهوره كنص مباشر (ليس تشفيراً أمنياً).
-                    external_url_b64: kind === 'external' ? btoa(unescape(encodeURIComponent(externalUrl))) : '',
-                    external_url: '',
+                    external_url: kind === 'external' ? externalUrl : '',
+                    external_url_b64: kind === 'external' ? btoa(externalUrl) : '',
                     price_icon: finalPriceIcon,
                     package_icons: packageIcons,
                     order:parseInt(document.getElementById('gOrder').value,10) || 99,
@@ -1155,9 +1180,7 @@
 
             document.getElementById('gName').value = g.name || '';
             document.getElementById('gKind').value = g.kind || 'prices';
-            let savedExternalUrl = g.external_url || '';
-            if (!savedExternalUrl && g.external_url_b64) { try { savedExternalUrl = decodeURIComponent(escape(atob(g.external_url_b64))); } catch (_) { try { savedExternalUrl = atob(g.external_url_b64); } catch (_) {} } }
-            document.getElementById('gExternalUrl').value = savedExternalUrl;
+            document.getElementById('gExternalUrl').value = g.external_url || '';
             document.getElementById('gPriceIcon').value = (g.price_icon && g.price_icon.length < 200) ? g.price_icon : '';
             document.getElementById('gPriceIconFile').value = '';
             toggleExternalFields();
@@ -1173,7 +1196,7 @@
 
             document.getElementById('customMethodsContainer').innerHTML = '';
             if (Array.isArray(g.custom_methods)) {
-                g.custom_methods.forEach(cm => addCustomMethodUI(cm.name, cm.prices, cm.prices_usd, cm));
+                g.custom_methods.forEach(cm => addCustomMethodUI(cm.name, cm.prices, cm.prices_usd));
             }
             refreshPackageIconRows(g.package_icons || {});
 
@@ -1436,9 +1459,145 @@
             catch(e){ alert('تعذر حذف الطلبات: '+dbErrorMessage(e)); }
         }
 
+
+        // ================== إدارة المحفظة ==================
+        function walletAdminEscape(value) {
+            return String(value == null ? '' : value).replace(/[&<>"']/g, ch => ({
+                '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+            }[ch]));
+        }
+        function walletAdminMoney(value, currency) {
+            const n = Number(value || 0);
+            return (Number.isFinite(n) ? n.toFixed(2) : '0.00') + ' ' + (currency === 'EGP' ? 'ج.م' : '$');
+        }
+        function walletAdminDate(value) {
+            if (!value) return 'غير متاح';
+            const d = new Date(Number(value));
+            return Number.isNaN(d.getTime()) ? 'غير متاح' : d.toLocaleString('ar-EG');
+        }
+        function walletDepositStatus(status) {
+            if (status === 'approved') return '<span class="wallet-admin-status wallet-status-approved">تمت الموافقة</span>';
+            if (status === 'rejected') return '<span class="wallet-admin-status wallet-status-rejected">مرفوض</span>';
+            return '<span class="wallet-admin-status wallet-status-pending">قيد المراجعة</span>';
+        }
+        async function saveWalletSettings() {
+            if (!isAdminReady()) return alert('يجب تسجيل الدخول أولاً.');
+            const rate = Number(document.getElementById('walletUsdToEgp').value);
+            if (!Number.isFinite(rate) || rate <= 0) return alert('أدخل سعر صرف صحيحاً أكبر من صفر.');
+            const btn = document.getElementById('saveWalletSettingsBtn');
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> جاري الحفظ…';
+            try {
+                await db.ref('wallet_settings/usdToEgp').set(rate);
+                const check = await db.ref('wallet_settings/usdToEgp').once('value');
+                if (Number(check.val()) !== rate) throw new Error('لم يتم التأكد من حفظ سعر الصرف.');
+                alert('تم حفظ سعر الصرف بنجاح.');
+            } catch (e) { alert('تعذر حفظ سعر الصرف: ' + dbErrorMessage(e)); }
+            finally { btn.disabled = false; btn.innerHTML = '<i class="fas fa-save"></i> حفظ سعر الصرف'; }
+        }
+        function renderWalletDeposits(snap) {
+            const list = document.getElementById('walletDepositsList');
+            if (!list) return;
+            const arr = [];
+            snap.forEach(child => arr.push({key:child.key, ...(child.val() || {})}));
+            arr.sort((a,b) => Number(b.createdAt || 0) - Number(a.createdAt || 0));
+            const pending = arr.filter(d => (d.status || 'pending') === 'pending').length;
+            document.getElementById('walletPendingCount').textContent = pending + ' طلب معلق';
+            if (!arr.length) { list.innerHTML = '<div class="request-empty">لا توجد طلبات إيداع حتى الآن.</div>'; return; }
+            list.innerHTML = arr.map(d => {
+                const key = walletAdminEscape(d.key), code = walletAdminEscape(d.code || d.key);
+                const email = walletAdminEscape(d.email || 'بدون بريد'), name = walletAdminEscape(d.displayName || 'مستخدم');
+                const sender = walletAdminEscape(d.sender || 'غير مسجل'), method = walletAdminEscape(d.methodName || d.method || 'غير محدد');
+                const target = walletAdminEscape(d.transferTarget || 'غير مسجل');
+                const amount = walletAdminEscape(walletAdminMoney(d.amount, d.currency === 'USD' ? 'USD' : 'EGP'));
+                const amountUsd = walletAdminEscape(walletAdminMoney(d.amountUsd, 'USD'));
+                const date = walletAdminEscape(walletAdminDate(d.createdAt));
+                const receipt = d.receiptUrl ? `<a class="wallet-admin-receipt" href="${walletAdminEscape(d.receiptUrl)}" target="_blank" rel="noopener noreferrer"><i class="fas fa-image"></i> فتح إيصال التحويل</a>` : '<div class="wallet-admin-meta">لا يوجد رابط إيصال مرفق.</div>';
+                const status = d.status || 'pending';
+                const actions = status === 'pending'
+                    ? `<div class="wallet-admin-actions"><button class="btn-small btn-green" type="button" onclick="approveWalletDeposit('${key}')"><i class="fas fa-check"></i> موافقة وإضافة الرصيد</button><button class="btn-small btn-red" type="button" onclick="rejectWalletDeposit('${key}')"><i class="fas fa-times"></i> رفض الطلب</button></div>` : '';
+                return `<div class="admin-card wallet-admin-card"><div class="wallet-admin-card-top"><div><div class="wallet-admin-code">${code}</div><strong>${name}</strong><div class="wallet-admin-meta">${email}</div></div><div>${walletDepositStatus(status)}</div></div>
+                    <div class="wallet-admin-meta" style="margin-top:12px"><div><strong>المبلغ المرسل:</strong> ${amount} — <strong>المضاف للمحفظة:</strong> ${amountUsd}</div>
+                    <div><strong>طريقة التحويل:</strong> ${method} | <strong>رقم التحويل:</strong> ${sender}</div><div><strong>رقم الاستلام:</strong> ${target}</div>
+                    <div><strong>UID:</strong> <span style="direction:ltr;display:inline-block;word-break:break-all">${walletAdminEscape(d.uid || '')}</span></div><div><strong>التاريخ:</strong> ${date}</div>${receipt}</div>${actions}</div>`;
+            }).join('');
+        }
+        async function approveWalletDeposit(key) {
+            if (!isAdminReady()) return alert('يجب تسجيل الدخول أولاً.');
+            if (!key) return;
+            try {
+                const snap = await db.ref('wallet_deposits/' + key).once('value');
+                if (!snap.exists()) return alert('طلب الإيداع غير موجود.');
+                const d = snap.val() || {};
+                if (d.status === 'approved') return alert('هذا الطلب تمت الموافقة عليه بالفعل.');
+                if (d.status === 'rejected') return alert('لا يمكن الموافقة على طلب مرفوض.');
+                if (!d.uid || !Number.isFinite(Number(d.amountUsd)) || Number(d.amountUsd) <= 0) return alert('بيانات الطلب غير مكتملة أو المبلغ غير صحيح.');
+                if (!confirm(`تأكيد إضافة ${Number(d.amountUsd).toFixed(2)} دولار إلى رصيد المستخدم؟ تأكد من مراجعة إيصال التحويل أولاً.`)) return;
+                const userRef = db.ref('wallet_users/' + d.uid);
+                const tx = await userRef.transaction(current => {
+                    current = current && typeof current === 'object' ? current : {};
+                    const processed = current.processedDeposits && typeof current.processedDeposits === 'object' ? current.processedDeposits : {};
+                    if (processed[key]) return current;
+                    const currentBalance = Number(current.balanceUsd || 0);
+                    if (!Number.isFinite(currentBalance)) return;
+                    processed[key] = true;
+                    current.processedDeposits = processed;
+                    current.balanceUsd = Math.round((currentBalance + Number(d.amountUsd)) * 10000) / 10000;
+                    current.updatedAt = Date.now();
+                    return current;
+                });
+                if (!tx.committed) throw new Error('تعذر تحديث رصيد المستخدم.');
+                await db.ref('wallet_deposits/' + key).update({status:'approved',reviewedAt:firebase.database.ServerValue.TIMESTAMP,reviewedBy:auth.currentUser.email || '',creditedAmountUsd:Number(d.amountUsd)});
+                alert('تمت الموافقة على الإيداع وتحديث رصيد المستخدم.');
+            } catch (e) { alert('حدث خطأ أثناء الموافقة: ' + dbErrorMessage(e) + '\\nيمكنك المحاولة مرة أخرى؛ لن يُضاف نفس الطلب مرتين.'); }
+        }
+        async function rejectWalletDeposit(key) {
+            if (!isAdminReady()) return alert('يجب تسجيل الدخول أولاً.');
+            if (!key || !confirm('هل تريد رفض طلب الإيداع هذا؟ لن تتم إضافة أي رصيد.')) return;
+            try {
+                const ref = db.ref('wallet_deposits/' + key), snap = await ref.once('value');
+                if (!snap.exists()) return alert('طلب الإيداع غير موجود.');
+                const d = snap.val() || {};
+                if (d.status === 'approved') return alert('لا يمكن رفض طلب تمت الموافقة عليه بالفعل.');
+                if (d.status === 'rejected') return alert('الطلب مرفوض بالفعل.');
+                await ref.update({status:'rejected',reviewedAt:firebase.database.ServerValue.TIMESTAMP,reviewedBy:auth.currentUser.email || ''});
+                alert('تم رفض طلب الإيداع.');
+            } catch (e) { alert('تعذر رفض الطلب: ' + dbErrorMessage(e)); }
+        }
+        function renderWalletOrders(snap) {
+            const list = document.getElementById('walletOrdersList');
+            if (!list) return;
+            const arr = [];
+            snap.forEach(userChild => userChild.forEach(orderChild => {
+                const o = orderChild.val() || {};
+                arr.push({...o, uid:o.uid || userChild.key, key:orderChild.key});
+            }));
+            arr.sort((a,b) => Number(b.createdAt || 0) - Number(a.createdAt || 0));
+            const recent = arr.slice(0,100);
+            if (!recent.length) { list.innerHTML = '<div class="request-empty">لا توجد عمليات شراء مسجلة من المحفظة.</div>'; return; }
+            list.innerHTML = recent.map(o => {
+                const status = o.status === 'paid' ? '<span class="wallet-admin-status wallet-status-approved">تم الخصم</span>' : `<span class="wallet-admin-status wallet-status-pending">${walletAdminEscape(o.status || 'غير معروف')}</span>`;
+                return `<div class="admin-card wallet-admin-card"><div class="wallet-admin-card-top"><div><div class="wallet-admin-code">${walletAdminEscape(o.code || o.key)}</div><strong>${walletAdminEscape(o.game || 'منتج')} — ${walletAdminEscape(o.pack || 'باقة')}</strong><div class="wallet-admin-meta">${walletAdminEscape(o.email || '')}</div></div>${status}</div>
+                <div class="wallet-admin-meta" style="margin-top:10px"><div><strong>السعر الأصلي:</strong> ${walletAdminEscape(o.price || '')} | <strong>المخصوم:</strong> ${walletAdminEscape(walletAdminMoney(o.costUsd, 'USD'))}</div>
+                <div><strong>طريقة الشحن:</strong> ${walletAdminEscape(o.method || 'غير محدد')} | <strong>التاريخ:</strong> ${walletAdminEscape(walletAdminDate(o.createdAt))}</div><div><strong>UID:</strong> <span style="direction:ltr;display:inline-block;word-break:break-all">${walletAdminEscape(o.uid || '')}</span></div></div></div>`;
+            }).join('');
+        }
+        function refreshWalletOrders() {
+            if (!isAdminReady()) return alert('يجب تسجيل الدخول أولاً.');
+            db.ref('wallet_orders').once('value').then(renderWalletOrders).catch(e => {
+                document.getElementById('walletOrdersList').innerHTML = '<div class="request-empty">تعذر تحميل العمليات: ' + walletAdminEscape(dbErrorMessage(e)) + '</div>';
+            });
+        }
+
         function startDataListeners() {
             if (dataListenersStarted || !isAdminReady()) return;
             dataListenersStarted = true;
+
+            safeListener(db.ref('wallet_settings/usdToEgp'), snap => {
+                if (snap.exists()) document.getElementById('walletUsdToEgp').value = Number(snap.val()) || '';
+            });
+            safeListener(db.ref('wallet_deposits'), renderWalletDeposits);
+            safeListener(db.ref('wallet_orders'), renderWalletOrders);
 
             const logoRef = db.ref('settings/general/logo');
             safeListener(logoRef, snap => {
