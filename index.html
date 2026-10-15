@@ -1478,6 +1478,8 @@
         function walletDepositStatus(status) {
             if (status === 'approved') return '<span class="wallet-admin-status wallet-status-approved">تمت الموافقة</span>';
             if (status === 'rejected') return '<span class="wallet-admin-status wallet-status-rejected">مرفوض</span>';
+            if (status === 'uploading_receipt') return '<span class="wallet-admin-status wallet-status-pending">جاري رفع الإيصال</span>';
+            if (status === 'upload_failed') return '<span class="wallet-admin-status wallet-status-rejected">فشل رفع الإيصال</span>';
             return '<span class="wallet-admin-status wallet-status-pending">قيد المراجعة</span>';
         }
         async function saveWalletSettings() {
@@ -1509,6 +1511,11 @@
                 const email = walletAdminEscape(d.email || 'بدون بريد'), name = walletAdminEscape(d.displayName || 'مستخدم');
                 const sender = walletAdminEscape(d.sender || 'غير مسجل'), method = walletAdminEscape(d.methodName || d.method || 'غير محدد');
                 const target = walletAdminEscape(d.transferTarget || 'غير مسجل');
+                const userPhone = walletAdminEscape(d.userPhone || 'غير متاح');
+                const transactionReference = walletAdminEscape(d.transactionReference || 'غير مضاف');
+                const fxRate = walletAdminEscape(d.fxRateAtRequest || 'غير متاح');
+                const receiptName = walletAdminEscape(d.receiptName || 'غير متاح');
+                const errorDetails = walletAdminEscape(d.uploadError || '');
                 const amount = walletAdminEscape(walletAdminMoney(d.amount, d.currency === 'USD' ? 'USD' : 'EGP'));
                 const amountUsd = walletAdminEscape(walletAdminMoney(d.amountUsd, 'USD'));
                 const date = walletAdminEscape(walletAdminDate(d.createdAt));
@@ -1518,8 +1525,10 @@
                     ? `<div class="wallet-admin-actions"><button class="btn-small btn-green" type="button" onclick="approveWalletDeposit('${key}')"><i class="fas fa-check"></i> موافقة وإضافة الرصيد</button><button class="btn-small btn-red" type="button" onclick="rejectWalletDeposit('${key}')"><i class="fas fa-times"></i> رفض الطلب</button></div>` : '';
                 return `<div class="admin-card wallet-admin-card"><div class="wallet-admin-card-top"><div><div class="wallet-admin-code">${code}</div><strong>${name}</strong><div class="wallet-admin-meta">${email}</div></div><div>${walletDepositStatus(status)}</div></div>
                     <div class="wallet-admin-meta" style="margin-top:12px"><div><strong>المبلغ المرسل:</strong> ${amount} — <strong>المضاف للمحفظة:</strong> ${amountUsd}</div>
-                    <div><strong>طريقة التحويل:</strong> ${method} | <strong>رقم التحويل:</strong> ${sender}</div><div><strong>رقم الاستلام:</strong> ${target}</div>
-                    <div><strong>UID:</strong> <span style="direction:ltr;display:inline-block;word-break:break-all">${walletAdminEscape(d.uid || '')}</span></div><div><strong>التاريخ:</strong> ${date}</div>${receipt}</div>${actions}</div>`;
+                    <div><strong>طريقة التحويل:</strong> ${method} | <strong>رقم/معرّف المحوّل:</strong> ${sender}</div><div><strong>رقم الاستلام:</strong> ${target}</div>
+                    <div><strong>هاتف الحساب:</strong> ${userPhone} | <strong>رقم العملية:</strong> ${transactionReference}</div>
+                    <div><strong>سعر الصرف وقت الطلب:</strong> ${fxRate} ج.م لكل دولار | <strong>اسم الإيصال:</strong> ${receiptName}</div>
+                    <div><strong>UID:</strong> <span style="direction:ltr;display:inline-block;word-break:break-all">${walletAdminEscape(d.uid || '')}</span></div><div><strong>معرّف الطلب:</strong> <span style="direction:ltr;display:inline-block;word-break:break-all">${walletAdminEscape(d.requestId || d.key || '')}</span></div><div><strong>التاريخ:</strong> ${date}</div>${errorDetails ? `<div style="color:#fca5a5;margin-top:6px"><strong>تفاصيل الخطأ:</strong> ${errorDetails}</div>` : ''}${receipt}</div>${actions}</div>`;
             }).join('');
         }
         async function approveWalletDeposit(key) {
