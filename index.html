@@ -628,6 +628,8 @@
                 <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
                     <h3 style="margin:0;"><i class="fas fa-receipt" style="color:#0284c7;"></i> عمليات الشراء من رصيد المحفظة</h3>
                     <button type="button" class="btn-small" style="background:#0284c7;" onclick="refreshWalletOrders()"><i class="fas fa-sync-alt"></i> تحديث</button>
+                    <input id="walletOrderSearch" type="search" placeholder="بحث بالكود أو المستخدم أو المنتج" oninput="refreshWalletOrders()" style="max-width:240px">
+                    <select id="walletOrderStatusFilter" onchange="refreshWalletOrders()"><option value="all">كل الطلبات</option><option value="pending_payment">بانتظار الدفع</option><option value="paid">بانتظار الشحن</option><option value="processing">قيد الشحن</option><option value="shipped">تم الشحن</option><option value="rejected">مرفوض</option></select>
                 </div>
                 <p style="font-size:.88rem;color:var(--text-light);line-height:1.8;">تظهر هنا الطلبات التي تم تسجيلها من صفحة الموقع، مع كود الدفع الذي يمكن مراجعته عند التواصل مع العميل.</p>
                 <div id="walletOrdersList" style="margin-top:16px;"><div class="request-empty">جاري تحميل عمليات الشراء…</div></div>
@@ -1606,22 +1608,26 @@
             } catch (e) { alert('تعذر رفض الطلب: ' + dbErrorMessage(e)); }
         }
         function renderWalletOrders(snap) {
-            const list = document.getElementById('walletOrdersList');
-            if (!list) return;
-            const arr = [];
-            snap.forEach(userChild => userChild.forEach(orderChild => {
-                const o = orderChild.val() || {};
-                arr.push({...o, uid:o.uid || userChild.key, key:orderChild.key});
-            }));
-            arr.sort((a,b) => Number(b.createdAt || 0) - Number(a.createdAt || 0));
-            const recent = arr.slice(0,100);
-            if (!recent.length) { list.innerHTML = '<div class="request-empty">لا توجد عمليات شراء مسجلة من المحفظة.</div>'; return; }
-            list.innerHTML = recent.map(o => {
-                const status = o.status === 'paid' ? '<span class="wallet-admin-status wallet-status-approved">تم الخصم</span>' : `<span class="wallet-admin-status wallet-status-pending">${walletAdminEscape(o.status || 'غير معروف')}</span>`;
-                return `<div class="admin-card wallet-admin-card"><div class="wallet-admin-card-top"><div><div class="wallet-admin-code">${walletAdminEscape(o.code || o.key)}</div><strong>${walletAdminEscape(o.game || 'منتج')} — ${walletAdminEscape(o.pack || 'باقة')}</strong><div class="wallet-admin-meta">${walletAdminEscape(o.email || '')}</div></div>${status}</div>
-                <div class="wallet-admin-meta" style="margin-top:10px"><div><strong>السعر الأصلي:</strong> ${walletAdminEscape(o.price || '')} | <strong>المخصوم:</strong> ${walletAdminEscape(walletAdminMoney(o.costUsd, 'USD'))}</div>
-                <div><strong>طريقة الشحن:</strong> ${walletAdminEscape(o.method || 'غير محدد')} | <strong>التاريخ:</strong> ${walletAdminEscape(walletAdminDate(o.createdAt))}</div><div><strong>UID:</strong> <span style="direction:ltr;display:inline-block;word-break:break-all">${walletAdminEscape(o.uid || '')}</span></div></div></div>`;
+            const list = document.getElementById('walletOrdersList'); if (!list) return;
+            const arr=[]; snap.forEach(userChild=>userChild.forEach(orderChild=>{const o=orderChild.val()||{};arr.push({...o,uid:o.uid||userChild.key,key:orderChild.key});}));
+            arr.sort((a,b)=>Number(b.createdAt||0)-Number(a.createdAt||0));
+            const q=(document.getElementById('walletOrderSearch')?.value||'').toLowerCase().trim();
+            const filter=document.getElementById('walletOrderStatusFilter')?.value||'all';
+            const filtered=arr.filter(o=>(filter==='all'||o.status===filter)&&(!q||[o.code,o.email,o.uid,o.game,o.pack,o.price].some(v=>String(v||'').toLowerCase().includes(q))));
+            if(!filtered.length){list.innerHTML='<div class="request-empty">لا توجد طلبات مطابقة للبحث أو الفلتر.</div>';return;}
+            const labels={pending_payment:'بانتظار الدفع',paid:'تم الدفع — بانتظار الشحن',processing:'قيد الشحن',shipped:'تم الشحن',rejected:'مرفوض',cancelled:'ملغي'};
+            list.innerHTML=filtered.slice(0,250).map(o=>{const code=walletAdminEscape(o.code||o.key),uid=walletAdminEscape(o.uid||''),status=o.status||'unknown';
+              return `<div class="admin-card wallet-admin-card"><div class="wallet-admin-card-top"><div><div class="wallet-admin-code">${code}</div><strong>${walletAdminEscape(o.game||'منتج')} — ${walletAdminEscape(o.pack||'باقة')}</strong><div class="wallet-admin-meta">${walletAdminEscape(o.email||'بدون بريد')} · ${walletAdminEscape(o.price||'')}</div></div><span class="wallet-admin-status ${status==='shipped'?'wallet-status-approved':status==='rejected'?'wallet-status-rejected':'wallet-status-pending'}">${labels[status]||walletAdminEscape(status)}</span></div>
+              <div class="wallet-admin-meta" style="margin-top:10px"><div><strong>طريقة الطلب:</strong> ${walletAdminEscape(o.paymentType==='whatsapp'?'واتساب غير مدفوع':'محفظة')} | <strong>طريقة الشحن:</strong> ${walletAdminEscape(o.method||'غير محدد')}</div><div><strong>UID:</strong> <span style="direction:ltr;display:inline-block;word-break:break-all">${uid}</span> | <strong>التاريخ:</strong> ${walletAdminEscape(walletAdminDate(o.createdAt))}</div></div>
+              <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px"><button class="btn-small" onclick="setWalletOrderStatus('${walletAdminEscape(o.uid)}','${walletAdminEscape(o.key)}','processing')">قيد الشحن</button><button class="btn-small" style="background:#059669" onclick="setWalletOrderStatus('${walletAdminEscape(o.uid)}','${walletAdminEscape(o.key)}','shipped')">تم الشحن</button><button class="btn-small" style="background:#dc2626" onclick="setWalletOrderStatus('${walletAdminEscape(o.uid)}','${walletAdminEscape(o.key)}','rejected')">رفض</button><button class="btn-small" style="background:#64748b" onclick="setWalletOrderStatus('${walletAdminEscape(o.uid)}','${walletAdminEscape(o.key)}','pending_payment')">بانتظار الدفع</button></div></div>`;
             }).join('');
+        }
+        async function setWalletOrderStatus(uid,key,status){
+            if(!isAdminReady())return alert('يجب تسجيل الدخول بحساب الإدارة.');
+            const names={processing:'قيد الشحن',shipped:'تم الشحن',rejected:'مرفوض',pending_payment:'بانتظار الدفع'};
+            if(!confirm(`تأكيد تغيير حالة الطلب إلى «${names[status]||status}»؟`))return;
+            try{await db.ref(`wallet_orders/${uid}/${key}`).update({status,updatedAt:firebase.database.ServerValue.TIMESTAMP,updatedBy:auth.currentUser.email||''});alert('تم تحديث حالة الطلب، وستظهر للعميل في طلباته.');}
+            catch(e){alert('تعذر تحديث حالة الطلب: '+dbErrorMessage(e));}
         }
         async function refreshWalletDeposits() {
             const list = document.getElementById('walletDepositsList');
