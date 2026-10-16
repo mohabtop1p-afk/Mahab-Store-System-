@@ -273,6 +273,7 @@
         .wallet-admin-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
         .wallet-admin-actions a{display:inline-flex;align-items:center;gap:7px;text-decoration:none}
         .wallet-admin-receipt{display:inline-block;color:#0284c7;font-weight:800;margin-top:8px}
+        .wallet-admin-receipt-preview{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:12px}.wallet-admin-receipt-preview img{width:110px;height:100px;object-fit:cover;border:1px solid #94a3b8;border-radius:10px;cursor:zoom-in;background:#fff}
         .wallet-admin-status{display:inline-block;border-radius:8px;padding:5px 10px;font-size:.82rem;font-weight:800}
         .wallet-status-pending{background:#fef3c7;color:#92400e}
         .wallet-status-approved{background:#d1fae5;color:#065f46}
@@ -626,12 +627,12 @@
 
             <div class="form-section" style="border-top:4px solid #0ea5e9;">
                 <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
-                    <h3 style="margin:0;"><i class="fas fa-receipt" style="color:#0284c7;"></i> عمليات الشراء من رصيد المحفظة</h3>
+                    <h3 style="margin:0;"><i class="fas fa-receipt" style="color:#0284c7;"></i> طلبات الشحن والشراء</h3>
                     <button type="button" class="btn-small" style="background:#0284c7;" onclick="refreshWalletOrders()"><i class="fas fa-sync-alt"></i> تحديث</button>
                     <input id="walletOrderSearch" type="search" placeholder="بحث بالكود أو المستخدم أو المنتج" oninput="refreshWalletOrders()" style="max-width:240px">
                     <select id="walletOrderStatusFilter" onchange="refreshWalletOrders()"><option value="all">كل الطلبات</option><option value="pending_payment">بانتظار الدفع</option><option value="paid">بانتظار الشحن</option><option value="processing">قيد الشحن</option><option value="shipped">تم الشحن</option><option value="rejected">مرفوض</option></select>
                 </div>
-                <p style="font-size:.88rem;color:var(--text-light);line-height:1.8;">تظهر هنا الطلبات التي تم تسجيلها من صفحة الموقع، مع كود الدفع الذي يمكن مراجعته عند التواصل مع العميل.</p>
+                <p style="font-size:.88rem;color:var(--text-light);line-height:1.8;">تظهر هنا كل طلبات الشحن، سواء كانت مدفوعة من المحفظة أو مرسلة عبر واتساب، ويمكن تحديث حالة الطلب لتظهر للعميل في صفحة طلباتي.</p>
                 <div id="walletOrdersList" style="margin-top:16px;"><div class="request-empty">جاري تحميل عمليات الشراء…</div></div>
             </div>
         </div>
@@ -1505,7 +1506,13 @@
             finally { btn.disabled = false; btn.innerHTML = '<i class="fas fa-save"></i> حفظ سعر الصرف'; }
         }
         let walletDepositsCache = {};
-        function renderWalletDeposits(snap) {
+        function walletViewReceipt(src){
+            if(!src)return;
+            let modal=document.getElementById('walletReceiptViewer');
+            if(!modal){modal=document.createElement('div');modal.id='walletReceiptViewer';modal.style.cssText='position:fixed;inset:0;z-index:999999;background:rgba(0,0,0,.88);display:none;align-items:center;justify-content:center;padding:18px;';modal.innerHTML='<button type="button" aria-label="إغلاق" class="wallet-receipt-close" style="position:absolute;top:12px;right:16px;border:0;border-radius:12px;padding:10px 16px;background:#fff;color:#111;font-size:22px">×</button><img alt="إيصال التحويل" style="max-width:100%;max-height:88vh;object-fit:contain;border-radius:12px;background:#fff">';document.body.appendChild(modal);modal.querySelector('.wallet-receipt-close').onclick=()=>modal.style.display='none';modal.onclick=e=>{if(e.target===modal)modal.style.display='none';};}
+            modal.querySelector('img').src=src;modal.style.display='flex';
+        }
+                function renderWalletDeposits(snap) {
             walletDepositsCache = {};
             snap.forEach(child => { walletDepositsCache[child.key] = child.val() || {}; });
             const diag = document.getElementById('walletDepositDiagnostics');
@@ -1542,7 +1549,7 @@
                 const amount = walletAdminEscape(walletAdminMoney(d.amount, d.currency === 'USD' ? 'USD' : 'EGP'));
                 const amountUsd = walletAdminEscape(walletAdminMoney(d.amountUsd, 'USD'));
                 const date = walletAdminEscape(walletAdminDate(d.createdAt));
-                const receipt = d.receiptDataUrl ? `<a class="wallet-admin-receipt" href="${d.receiptDataUrl}" target="_blank" rel="noopener noreferrer"><i class="fas fa-image"></i> فتح إيصال التحويل</a>` : (d.receiptUrl ? `<a class="wallet-admin-receipt" href="${walletAdminEscape(d.receiptUrl)}" target="_blank" rel="noopener noreferrer"><i class="fas fa-image"></i> فتح إيصال التحويل</a>` : '<div class="wallet-admin-meta">لا يوجد إيصال مرفق.</div>');
+                const receiptSrc = d.receiptDataUrl || d.receiptUrl || ''; const receipt = receiptSrc ? `<div class="wallet-admin-receipt-preview"><img src="${receiptSrc}" alt="إيصال التحويل" loading="lazy" decoding="async" onclick="walletViewReceipt(this.src)" onerror="this.style.display='none';this.nextElementSibling.style.display='inline-block'"><button type="button" class="wallet-admin-receipt" style="display:none" onclick="walletViewReceipt('${receiptSrc}')">عرض الإيصال</button><button type="button" class="wallet-admin-receipt" onclick="walletViewReceipt(this.parentElement.querySelector('img').src)"><i class="fas fa-expand"></i> تكبير الإيصال</button></div>` : '<div class="wallet-admin-meta">لا يوجد إيصال مرفق.</div>';
                 const status = d.status || 'pending';
                 const actions = status === 'pending' ? `<div class="wallet-admin-actions"><button class="btn-small btn-green" type="button" onclick="approveWalletDeposit('${key}')"><i class="fas fa-check"></i> موافقة وإضافة الرصيد</button><button class="btn-small btn-red" type="button" onclick="rejectWalletDeposit('${key}')"><i class="fas fa-times"></i> رفض الطلب</button></div>` : `<div class="wallet-admin-actions">${status === 'upload_failed' ? `<button class="btn-small btn-green" type="button" onclick="markWalletDepositPending('${key}')">إعادة للمراجعة</button>` : ''}<button class="btn-small btn-red" type="button" onclick="deleteWalletDeposit('${key}')"><i class="fas fa-trash"></i> حذف السجل</button></div>`;
                 return `<div class="admin-card wallet-admin-card"><div class="wallet-admin-card-top"><div><div class="wallet-admin-code">${code}</div><strong>${name}</strong><div class="wallet-admin-meta">${email}</div></div><div>${walletDepositStatus(status)}</div></div><div class="wallet-admin-meta" style="margin-top:12px"><div><strong>المبلغ المرسل:</strong> ${amount} — <strong>المضاف للمحفظة:</strong> ${amountUsd}</div><div><strong>طريقة التحويل:</strong> ${method} | <strong>رقم/معرّف المحوّل:</strong> ${sender}</div><div><strong>رقم الاستلام:</strong> ${target}</div><div><strong>هاتف الحساب:</strong> ${userPhone} | <strong>رقم العملية:</strong> ${transactionReference}</div><div><strong>سعر الصرف وقت الطلب:</strong> ${fxRate} ج.م لكل دولار | <strong>اسم الإيصال:</strong> ${receiptName}</div><div><strong>UID:</strong> <span style="direction:ltr;display:inline-block;word-break:break-all">${walletAdminEscape(d.uid || '')}</span></div><div><strong>معرّف الطلب:</strong> <span style="direction:ltr;display:inline-block;word-break:break-all">${walletAdminEscape(d.requestId || d.key || '')}</span></div><div><strong>التاريخ:</strong> ${date}</div>${errorDetails ? `<div style="color:#fca5a5;margin-top:6px"><strong>تفاصيل الخطأ:</strong> ${errorDetails}</div>` : ''}${receipt}</div>${actions}</div>`;
