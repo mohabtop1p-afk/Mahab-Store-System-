@@ -590,6 +590,15 @@
                 <button id="launchDiscBtn" class="action-btn btn-yellow" style="color:#000; font-size:1.1rem;" onclick="createDiscount()"><i class="fas fa-rocket"></i> إطلاق الخصم الآن</button>
             </div>
 
+            <div class="form-section" style="border-top:4px solid #10b981;background:linear-gradient(135deg,#fff,#f0fdf4)">
+                <h3 style="color:#047857"><i class="fas fa-gift"></i> خصم الشراء التالي من المحفظة</h3>
+                <p style="color:#64748b;line-height:1.8">بعد كل عملية شراء ناجحة من المحفظة، يحصل العميل على خصم للشراء التالي. الخصم المستخدم يُستهلك مرة واحدة فقط. حدّد تفعيل النظام ووزن ظهور كل نسبة؛ الوزن الأعلى يعني فرصة ظهور أكبر.</p>
+                <label class="toggle-line" style="margin:12px 0 18px"><input type="checkbox" id="walletDiscountEnabled" checked><span>تفعيل نظام خصم الشراء التالي</span></label>
+                <div id="walletDiscountOptions" class="row" style="align-items:stretch"></div>
+                <button class="action-btn" type="button" onclick="saveWalletDiscountSettings()" style="background:#059669"><i class="fas fa-save"></i> حفظ إعدادات خصومات المحفظة</button>
+                <div id="walletDiscountSettingsMsg" style="margin-top:10px;color:#047857;font-size:.85rem"></div>
+            </div>
+
             <h3>الخصومات النشطة حالياً</h3>
             <div id="activeDiscountsList"></div>
 
@@ -1834,6 +1843,27 @@
         document.getElementById('welcomePopupImageUrl').addEventListener('input', function() {
             if (this.value.trim()) updateWelcomePopupPreview(this.value.trim());
         });
+
+
+        // إعدادات نسب خصم الشراء التالي للمحفظة
+        const walletDiscountDefaults={5:{enabled:true,weight:45},6:{enabled:true,weight:25},7:{enabled:true,weight:15},8:{enabled:true,weight:8},9:{enabled:true,weight:5},10:{enabled:true,weight:2}};
+        function renderWalletDiscountSettings(value){
+            const settings=value&&typeof value==='object'?value:{enabled:true,options:walletDiscountDefaults};
+            const options=settings.options||walletDiscountDefaults;
+            const box=document.getElementById('walletDiscountOptions');if(!box)return;
+            document.getElementById('walletDiscountEnabled').checked=settings.enabled!==false;
+            box.innerHTML=Object.keys(walletDiscountDefaults).map(p=>{const o=options[p]||walletDiscountDefaults[p];return `<div style="flex:1;min-width:125px;background:#fff;border:1px solid #d1fae5;border-radius:14px;padding:12px"><label class="toggle-line"><input type="checkbox" id="wdEnabled${p}" ${o.enabled!==false?'checked':''}><span>خصم ${p}%</span></label><label style="margin-top:12px">وزن الظهور</label><input type="number" id="wdWeight${p}" min="0" max="10000" step="1" value="${Math.max(0,Number(o.weight)||0)}"><small style="display:block;color:#64748b;line-height:1.6;margin-top:6px">0 = فرصة معدومة</small></div>`}).join('');
+        }
+        async function saveWalletDiscountSettings(){
+            if(!isAdminReady())return alert('يجب تسجيل الدخول أولاً.');
+            const msg=document.getElementById('walletDiscountSettingsMsg');
+            const options={};let total=0;
+            [5,6,7,8,9,10].forEach(p=>{const weight=Math.max(0,Math.min(10000,Number(document.getElementById('wdWeight'+p)?.value)||0));const enabled=!!document.getElementById('wdEnabled'+p)?.checked;options[p]={enabled,weight};if(enabled)total+=weight;});
+            if(document.getElementById('walletDiscountEnabled').checked&&total<=0)return alert('فعّل نسبة خصم واحدة على الأقل واجعل وزنها أكبر من صفر.');
+            try{await db.ref('wallet_discount_settings').set({enabled:document.getElementById('walletDiscountEnabled').checked,options,updatedAt:firebase.database.ServerValue.TIMESTAMP,updatedBy:auth.currentUser.email||''});msg.textContent='تم حفظ إعدادات الخصومات بنجاح.';}
+            catch(e){msg.textContent='تعذر الحفظ: '+dbErrorMessage(e);}
+        }
+        db.ref('wallet_discount_settings').on('value',snap=>renderWalletDiscountSettings(snap.val()));
 
     </script>
 </body>
