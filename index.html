@@ -25,6 +25,12 @@
             --shadow: 0 10px 25px -5px rgba(0,0,0,0.05);
         }
         
+
+        /* لا تلوّن الصور المرفوعة؛ الشفافية جزء من ملف الصورة ويجب أن تظل ظاهرة */
+        img { background-color: transparent; background-image: none; }
+        .package-icon-preview img, #packageIconRows img, #welcomePopupPreviewImg { background: transparent !important; background-color: transparent !important; background-image: none !important; object-fit: contain !important; }
+        .package-icon-preview, .package-icon-row-preview { background-color:#fff !important; background-image:linear-gradient(45deg,#e5e7eb 25%,transparent 25%),linear-gradient(-45deg,#e5e7eb 25%,transparent 25%),linear-gradient(45deg,transparent 75%,#e5e7eb 75%),linear-gradient(-45deg,transparent 75%,#e5e7eb 75%) !important; background-size:14px 14px !important; background-position:0 0,0 7px,7px -7px,-7px 0 !important; }
+
         body { 
             font-family: 'Almarai', sans-serif; 
             background: var(--bg); 
@@ -266,6 +272,14 @@
         .admin-user-bar button{border:0;background:#fee2e2;color:#b91c1c;border-radius:8px;padding:7px 9px;cursor:pointer;font-family:inherit;font-weight:700}
         @media(max-width:768px){.admin-user-bar{top:8px;left:8px}.admin-user-bar span{display:none}}
 
+
+        .wallet-subtabs{display:flex;gap:9px;flex-wrap:wrap;margin:0 0 20px;padding:12px;background:#eaf2f8;border:1px solid #dbe7f0;border-radius:16px;position:sticky;top:78px;z-index:20}
+        .wallet-subtab-btn{appearance:none;border:1px solid #cbd5e1;background:#fff;color:#475569;border-radius:12px;padding:11px 14px;font:inherit;font-size:.88rem;font-weight:800;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:8px;transition:.18s}
+        .wallet-subtab-btn:hover{border-color:#0d9488;color:#0f766e}
+        .wallet-subtab-btn.active{background:#0d9488;color:#fff;border-color:#0d9488;box-shadow:0 5px 14px #0d948826}
+        .wallet-subpanel{display:none;animation:slideUp .22s ease}
+        .wallet-subpanel.active{display:block}
+        @media(max-width:600px){.wallet-subtabs{position:static;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));padding:9px;gap:7px}.wallet-subtab-btn{padding:10px 7px;font-size:.78rem}.wallet-subtab-btn:last-child{grid-column:1/-1}}
 
         /* ===== إدارة المحفظة والإيداعات ===== */
         .wallet-admin-stat{background:#f0f9ff;border:1px solid #bae6fd;border-radius:14px;padding:15px;line-height:1.8}
@@ -592,7 +606,7 @@
 
             <div class="form-section" style="border-top:4px solid #10b981;background:linear-gradient(135deg,#fff,#f0fdf4)">
                 <h3 style="color:#047857"><i class="fas fa-gift"></i> خصم الشراء التالي من المحفظة</h3>
-                <p style="color:#64748b;line-height:1.8">بعد كل عملية شراء ناجحة من المحفظة، يحصل العميل على خصم للشراء التالي. الخصم المستخدم يُستهلك مرة واحدة فقط. حدّد تفعيل النظام ووزن ظهور كل نسبة؛ الوزن الأعلى يعني فرصة ظهور أكبر.</p>
+                <p style="color:#64748b;line-height:1.8">بعد الشراء بالسعر الكامل يحصل العميل على خصم للشراء التالي. عند استخدام الخصم، يُستهلك مرة واحدة ولا يحصل على خصم جديد إلا بعد عملية الشراء التالية بالسعر الكامل؛ وهكذا بالتبادل. حدّد تفعيل النظام ووزن ظهور كل نسبة؛ الوزن الأعلى يعني فرصة ظهور أكبر.</p>
                 <label class="toggle-line" style="margin:12px 0 18px"><input type="checkbox" id="walletDiscountEnabled" checked><span>تفعيل نظام خصم الشراء التالي</span></label>
                 <div id="walletDiscountOptions" class="row" style="align-items:stretch"></div>
                 <div style="margin-top:16px;padding:16px;border:1px solid #bae6fd;border-radius:14px;background:#f0f9ff;max-width:440px"><label for="walletDiscountExpiryHours" style="color:#075985">مدة صلاحية الخصم بعد الحصول عليه (بالساعات)</label><input type="number" id="walletDiscountExpiryHours" min="1" max="8760" step="1" value="24"><small style="display:block;color:#475569;line-height:1.7">مثال: 24 = يوم واحد، 48 = يومين. المدة تطبق على الخصومات الجديدة فقط.</small></div>
@@ -611,7 +625,14 @@
         <!-- التبويب 5: المحفظة والإيداعات -->
         <div id="tab-wallet" class="tab-content">
             <h2>إدارة المحفظة <i class="fas fa-wallet" style="color:#0d9488;"></i></h2>
-            <div class="form-section" style="border-top:4px solid #0d9488;">
+            <div class="wallet-subtabs" role="tablist" aria-label="أقسام إدارة المحفظة">
+                <button type="button" class="wallet-subtab-btn active" onclick="walletAdminSection('settings',this)"><i class="fas fa-sliders-h"></i> إعدادات العملة</button>
+                <button type="button" class="wallet-subtab-btn" onclick="walletAdminSection('methods',this)"><i class="fas fa-credit-card"></i> طرق الإيداع</button>
+                <button type="button" class="wallet-subtab-btn" onclick="walletAdminSection('users',this)"><i class="fas fa-users"></i> المستخدمون والأرصدة</button>
+                <button type="button" class="wallet-subtab-btn" onclick="walletAdminSection('deposits',this)"><i class="fas fa-money-bill-transfer"></i> طلبات الإيداع</button>
+                <button type="button" class="wallet-subtab-btn" onclick="walletAdminSection('orders',this)"><i class="fas fa-box"></i> طلبات الشحن والشراء</button>
+            </div>
+            <div class="wallet-subpanel active" id="wallet-panel-settings"><div class="form-section" style="border-top:4px solid #0d9488;">
                 <h3><i class="fas fa-coins" style="color:#0d9488;"></i> إعدادات العملة وسعر الصرف</h3>
                 <p style="color:var(--text-light);line-height:1.8;font-size:.9rem;">القيمة الأساسية للرصيد تُحفظ بالجنيه المصري لتثبيت قيمة الرصيد القديم عند تغيير سعر الصرف. السعر الجديد يُطبّق على الإيداعات والمشتريات الجديدة فقط.</p>
                 <div class="row">
@@ -619,9 +640,9 @@
                     <div><button class="action-btn" id="saveWalletSettingsBtn" onclick="saveWalletSettings()"><i class="fas fa-save"></i> حفظ سعر الصرف</button></div>
                 </div>
                 <div class="wallet-admin-stat"><i class="fas fa-info-circle"></i> تغيير سعر الصرف لا يرفع قيمة الرصيد القديم بالجنيه؛ ويُستخدم السعر الجديد عند الإيداع والشراء الجديدين.</div>
-            </div>
+            </div></div>
 
-            <div class="form-section" style="border-top:4px solid #8b5cf6;">
+            <div class="wallet-subpanel" id="wallet-panel-methods"><div class="form-section" style="border-top:4px solid #8b5cf6;">
                 <h3><i class="fas fa-credit-card" style="color:#8b5cf6"></i> إدارة طرق الإيداع</h3>
                 <p style="color:var(--text-light);line-height:1.8;font-size:.9rem">أضف طريقة جديدة أو عدّل الاسم والرقم/المعرّف والشعار، أو عطّل/احذف طريقة. ستظهر الطرق المفعّلة في صفحة المحفظة بالموقع.</p>
                 <input type="hidden" id="walletMethodEditKey">
@@ -629,16 +650,16 @@
                 <div class="row"><div><label>رقم التحويل أو المعرّف</label><input id="walletMethodTarget" placeholder="رقم الهاتف أو المعرّف"></div><div><label>رابط شعار الطريقة (اختياري)</label><input id="walletMethodLogo" placeholder="https://.../logo.png"></div></div>
                 <div class="row"><div><label>معرّف داخلي فريد (إنشاء جديد)</label><input id="walletMethodKey" placeholder="vodafone_cash أو binance_pay"></div><div style="display:flex;align-items:end;gap:8px;flex-wrap:wrap"><button class="action-btn" type="button" onclick="saveWalletMethod()"><i class="fas fa-save"></i> حفظ الطريقة</button><button class="btn-small" type="button" onclick="clearWalletMethodForm()">تفريغ الحقول</button></div></div>
                 <div id="walletMethodsAdminList" style="margin-top:14px">جاري تحميل طرق الإيداع…</div>
-            </div>
+            </div></div>
 
-            <div class="form-section" style="border-top:4px solid #0891b2;">
+            <div class="wallet-subpanel" id="wallet-panel-users"><div class="form-section" style="border-top:4px solid #0891b2;">
                 <h3><i class="fas fa-users" style="color:#0891b2"></i> إدارة أرصدة المستخدمين</h3>
                 <p style="color:var(--text-light);line-height:1.8;font-size:.9rem">ابحث بالبريد الإلكتروني أو كود المستخدم، ثم أضف أو اخصم رصيدًا بالدولار. كل تعديل يُسجّل في سجل العمليات.</p>
                 <div class="row"><div style="flex:2"><input id="walletUserSearch" type="search" placeholder="بحث بالبريد أو UID أو كود المستخدم" oninput="renderWalletUsers()"></div><div><button class="btn-small" type="button" onclick="refreshWalletUsers()"><i class="fas fa-sync"></i> تحديث المستخدمين</button></div></div>
                 <div id="walletUsersList" style="margin-top:14px">جاري تحميل المستخدمين…</div>
-            </div>
+            </div></div>
 
-            <div class="form-section" style="border-top:4px solid #f59e0b;">
+            <div class="wallet-subpanel" id="wallet-panel-deposits"><div class="form-section" style="border-top:4px solid #f59e0b;">
                 <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
                     <h3 style="margin:0;"><i class="fas fa-hourglass-half" style="color:#d97706;"></i> طلبات الإيداع المعلقة</h3>
                     <span id="walletPendingCount" class="badge" style="background:#fef3c7;color:#92400e;">0 طلب</span>
@@ -650,9 +671,9 @@
                     <div><button class="btn-small" type="button" onclick="refreshWalletDeposits()"><i class="fas fa-rotate"></i> تحديث الآن</button></div>
                     <div><button class="btn-small" type="button" onclick="exportWalletDepositsCsv()"><i class="fas fa-file-csv"></i> تصدير CSV</button></div>
                 </div><div id="walletDepositDiagnostics" class="wallet-admin-stat" style="margin-top:10px">بانتظار الاتصال بقاعدة البيانات…</div><div id="walletDepositsList" style="margin-top:16px;"><div class="request-empty">جاري تحميل طلبات الإيداع…</div></div>
-            </div>
+            </div></div>
 
-            <div class="form-section" style="border-top:4px solid #0ea5e9;">
+            <div class="wallet-subpanel" id="wallet-panel-orders"><div class="form-section" style="border-top:4px solid #0ea5e9;">
                 <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
                     <h3 style="margin:0;"><i class="fas fa-receipt" style="color:#0284c7;"></i> طلبات الشحن والشراء</h3>
                     <button type="button" class="btn-small" style="background:#0284c7;" onclick="refreshWalletOrders()"><i class="fas fa-sync-alt"></i> تحديث</button>
@@ -661,7 +682,7 @@
                 </div>
                 <p style="font-size:.88rem;color:var(--text-light);line-height:1.8;">تظهر هنا كل طلبات الشحن، سواء كانت مدفوعة من المحفظة أو مرسلة عبر واتساب، ويمكن تحديث حالة الطلب لتظهر للعميل في صفحة طلباتي.</p>
                 <div id="walletOrdersList" style="margin-top:16px;"><div class="request-empty">جاري تحميل عمليات الشراء…</div></div>
-            </div>
+            </div></div>
         </div>
 
     </div>
@@ -770,12 +791,23 @@
                         }
                         canvas.width = width; canvas.height = height;
                         ctx.drawImage(img, 0, 0, width, height);
-                        // جودة أخف حتى لا تتحول صور الإعدادات إلى بيانات ضخمة داخل RTDB.
-                        let result = canvas.toDataURL('image/jpeg', 0.68);
-                        // نمنع حفظ صورة ضخمة قد تؤدي إلى بطء/فشل الكتابة، ولا نلمس أي بيانات قديمة.
-                        if (result.length > 1400000) {
-                            result = canvas.toDataURL('image/jpeg', 0.52);
+                        // مهم: لا نحول PNG/WebP الشفاف إلى JPEG؛ JPEG لا يدعم الشفافية
+                        // ويملأ المساحات الشفافة بالأسود في بعض المتصفحات.
+                        const sourceType = (file.type || '').toLowerCase();
+                        const preserveAlpha = !['image/jpeg', 'image/jpg'].includes(sourceType);
+                        let result;
+                        if (preserveAlpha) {
+                            // WebP يحافظ على قناة ألفا مع حجم أقل عادةً. نستخدم PNG كخيار احتياطي.
+                            result = canvas.toDataURL('image/webp', 0.82);
+                            if (!result.startsWith('data:image/webp')) result = canvas.toDataURL('image/png');
+                            if (result.length > 1400000 && result.startsWith('data:image/webp')) {
+                                result = canvas.toDataURL('image/webp', 0.62);
+                            }
+                        } else {
+                            result = canvas.toDataURL('image/jpeg', 0.72);
+                            if (result.length > 1400000) result = canvas.toDataURL('image/jpeg', 0.55);
                         }
+                        // نمنع حفظ صورة ضخمة قد تؤدي إلى بطء/فشل الكتابة، ولا نلمس أي بيانات قديمة.
                         if (result.length > 1800000) {
                             reject(new Error('الصورة كبيرة جداً بعد الضغط. اختر صورة أصغر أو استخدم رابط صورة مباشر.'));
                             return;
@@ -833,7 +865,7 @@
                 const safeUrl = String(url).replace(/"/g, '&quot;');
                 const displayUrl = url.length > 100 ? 'صورة مرفوعة من المعرض' : url.replace(/</g,'&lt;').replace(/>/g,'&gt;');
                 html += `<div class="admin-card">
-                    <img src="${safeUrl}" style="height:60px;max-width:140px;object-fit:cover;border-radius:10px;background:#000;border:1px solid #cbd5e1;" onerror="this.src='https://via.placeholder.com/140x60?text=خطأ'">
+                    <img src="${safeUrl}" style="height:60px;max-width:140px;object-fit:contain;border-radius:10px;background:transparent!important;background-color:transparent!important;background-image:none!important;border:1px solid #cbd5e1;" onerror="this.src='https://via.placeholder.com/140x60?text=خطأ'">
                     <div style="flex:1;margin:0 15px;font-size:.85rem;color:var(--text-light);word-break:break-all;direction:ltr;text-align:left;">${displayUrl}</div>
                     <button class="btn-small btn-red" type="button" onclick="deleteBanner('${c.key}')"><i class="fas fa-trash"></i> حذف</button>
                 </div>`;
@@ -1104,11 +1136,11 @@
                 const safeName = name.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
                 const value = icons[name] || '';
                 const valueForInput = value.length < 200 ? value.replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;') : '';
-                const preview = value ? `<img src="${value}" alt="" style="width:36px;height:36px;object-fit:contain;border-radius:8px;background:#e2e8f0;padding:3px" onerror="this.style.display='none'">` : '';
+                const preview = value ? `<img src="${value}" alt="" style="width:36px;height:36px;object-fit:contain;border-radius:8px;background:transparent!important;background-color:transparent!important;background-image:none!important;padding:3px" onerror="this.style.display='none'">` : '';
                 return `<div class="package-icon-row" data-pack-name="${safeName}" style="display:grid;grid-template-columns:minmax(70px,.8fr) minmax(100px,1.4fr) auto;align-items:center;gap:8px;padding:10px 0;border-bottom:1px solid #e2e8f0">
                     <div style="font-weight:700;color:#0f172a;font-size:.88rem;overflow-wrap:anywhere">${safeName}</div>
                     <div style="display:flex;flex-direction:column;gap:6px"><input class="package-icon-url" type="url" value="${valueForInput}" placeholder="رابط صورة لهذه الباقة" style="width:100%;box-sizing:border-box"><label style="font-size:.78rem;color:#475569">أو اختر من المعرض <input class="package-icon-file" type="file" accept="image/*" style="display:block;width:100%;font-size:.76rem;margin-top:4px"></label><label style="font-size:.75rem;color:#64748b"><input type="checkbox" class="package-icon-clear"> حذف الأيقونة الخاصة والرجوع للصورة العامة</label></div>
-                    <div class="package-icon-preview">${preview}</div>
+                    <div class="package-icon-preview" style="background-color:#fff!important;background-image:linear-gradient(45deg,#e5e7eb 25%,transparent 25%),linear-gradient(-45deg,#e5e7eb 25%,transparent 25%),linear-gradient(45deg,transparent 75%,#e5e7eb 75%),linear-gradient(-45deg,transparent 75%,#e5e7eb 75%)!important;background-size:14px 14px!important;background-position:0 0,0 7px,7px -7px,-7px 0!important">${preview}</div>
                 </div>`;
             }).join('');
         }
@@ -1494,6 +1526,11 @@
             catch(e){ alert('تعذر حذف الطلبات: '+dbErrorMessage(e)); }
         }
 
+
+        function walletAdminSection(section, btn) {
+            document.querySelectorAll('#tab-wallet .wallet-subpanel').forEach(panel => panel.classList.toggle('active', panel.id === 'wallet-panel-' + section));
+            document.querySelectorAll('#tab-wallet .wallet-subtab-btn').forEach(button => button.classList.toggle('active', button === btn));
+        }
 
         // ================== إدارة المحفظة ==================
         function walletAdminEscape(value) {
