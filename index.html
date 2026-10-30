@@ -426,6 +426,21 @@
                 <button class="action-btn" onclick="addSocial()"><i class="fas fa-plus"></i> إضافة الزر</button>
                 <div id="socialsList" style="margin-top:20px;"></div>
             </div>
+
+            <div class="form-section" style="border-top:4px solid #0d9488">
+                <h3><i class="fas fa-images" style="color:#0d9488"></i> تخصيص صور وأبعاد الأيقونات</h3>
+                <p style="color:#64748b;line-height:1.8">تُطبّق صورة الإطار على جميع الألعاب والمنتجات تلقائيًا. يمكنك استخدام رابط صورة مباشر أو اختيار صورة من جهازك. اترك الرابط فارغًا لاستعادة الصورة الافتراضية.</p>
+                <div class="row"><div style="flex:2"><label>رابط إطار الألعاب (PNG شفاف يُفضّل):</label><input type="url" id="visualFrameUrl" placeholder="https://..."><input type="file" id="visualFrameFile" accept="image/*" class="file-input"></div></div>
+                <div class="row"><div><label>عرض الإطار (px)</label><input type="number" id="visualFrameWidth" min="20" max="300" value="75"></div><div><label>ارتفاع الإطار (px)</label><input type="number" id="visualFrameHeight" min="20" max="300" value="75"></div></div>
+                <div class="row"><div><label>عرض صورة اللعبة داخل الإطار (px)</label><input type="number" id="visualLogoWidth" min="10" max="250" value="61"></div><div><label>ارتفاع صورة اللعبة داخل الإطار (px)</label><input type="number" id="visualLogoHeight" min="10" max="250" value="61"></div></div>
+                <hr style="border:0;border-top:1px solid #e2e8f0;margin:20px 0">
+                <div class="row"><div style="flex:2"><label>صورة أيقونة المحفظة في الشريط العلوي:</label><input type="url" id="visualWalletIconUrl" placeholder="رابط صورة الأيقونة"><input type="file" id="visualWalletIconFile" accept="image/*" class="file-input"></div></div>
+                <div class="row"><div style="flex:2"><label>خلفية مربع الرصيد داخل المحفظة:</label><input type="url" id="visualBalanceBgUrl" placeholder="رابط صورة الخلفية"><input type="file" id="visualBalanceBgFile" accept="image/*" class="file-input"></div></div>
+                <div class="row"><div><label>طريقة ملاءمة خلفية الرصيد</label><select id="visualBalanceBgSize"><option value="cover">ملء المربع (Cover)</option><option value="contain">إظهار الصورة كاملة (Contain)</option></select></div><div><label>عتامة الطبقة الداكنة (0 إلى 0.95)</label><input type="number" id="visualBalanceOverlay" min="0" max="0.95" step="0.05" value="0.76"></div></div>
+                <button class="action-btn" type="button" id="saveVisualSettingsBtn" onclick="saveVisualSettings()"><i class="fas fa-save"></i> حفظ وتطبيق التخصيصات</button>
+                <button class="btn-small btn-yellow" type="button" style="width:100%;margin-top:10px" onclick="resetVisualSettings()">استعادة الإعدادات الافتراضية</button>
+                <div id="visualSettingsMsg" style="margin-top:10px;color:#047857;font-size:.85rem"></div>
+            </div>
         </div>
 
         <!-- التبويب 2: المنتجات والألعاب -->
@@ -1379,6 +1394,40 @@
             catch (e) { alert('تعذر إيقاف الخصم: ' + dbErrorMessage(e)); }
         }
 
+
+        let visualSettingsCache = {};
+        async function readVisualImage(fileInputId) {
+            const input=document.getElementById(fileInputId); const file=input?.files?.[0];
+            if(!file) return null;
+            if(!file.type.startsWith('image/')) throw new Error('اختر ملف صورة صحيحًا.');
+            if(file.size > 180*1024) throw new Error('حجم الصورة كبير. اختر صورة أقل من 180 كيلوبايت أو استخدم رابطًا مباشرًا.');
+            return await new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(String(r.result));r.onerror=()=>reject(new Error('تعذرت قراءة الصورة.'));r.readAsDataURL(file);});
+        }
+        async function loadVisualSettingsIntoForm(v){
+            visualSettingsCache=v||{};
+            const map={visualFrameUrl:'frameUrl',visualFrameWidth:'frameWidth',visualFrameHeight:'frameHeight',visualLogoWidth:'logoWidth',visualLogoHeight:'logoHeight',visualWalletIconUrl:'walletIconUrl',visualBalanceBgUrl:'balanceBgUrl',visualBalanceBgSize:'balanceBgSize',visualBalanceOverlay:'balanceOverlay'};
+            Object.entries(map).forEach(([id,key])=>{const el=document.getElementById(id);if(el && visualSettingsCache[key]!==undefined)el.value=visualSettingsCache[key];});
+        }
+        async function saveVisualSettings(){
+            if(!isAdminReady())return alert('يجب تسجيل الدخول أولاً.');
+            const btn=document.getElementById('saveVisualSettingsBtn'),msg=document.getElementById('visualSettingsMsg');btn.disabled=true;
+            try{
+                const v={...visualSettingsCache};
+                const fields={frameUrl:'visualFrameUrl',walletIconUrl:'visualWalletIconUrl',balanceBgUrl:'visualBalanceBgUrl'};
+                for(const [key,id] of Object.entries(fields)){const val=document.getElementById(id).value.trim();if(val)v[key]=val;else if(!document.getElementById(id).files?.length && document.getElementById(id).dataset.clear==='1')delete v[key];}
+                const frameFile=await readVisualImage('visualFrameFile'); if(frameFile)v.frameUrl=frameFile;
+                const iconFile=await readVisualImage('visualWalletIconFile'); if(iconFile)v.walletIconUrl=iconFile;
+                const bgFile=await readVisualImage('visualBalanceBgFile'); if(bgFile)v.balanceBgUrl=bgFile;
+                for(const [key,id,min,max] of [['frameWidth','visualFrameWidth',20,300],['frameHeight','visualFrameHeight',20,300],['logoWidth','visualLogoWidth',10,250],['logoHeight','visualLogoHeight',10,250]]){const n=Number(document.getElementById(id).value);if(!Number.isFinite(n)||n<min||n>max)throw new Error('راجع مقاسات الإطار والصورة؛ القيم خارج النطاق المسموح.');v[key]=n;}
+                v.balanceBgSize=document.getElementById('visualBalanceBgSize').value;
+                v.balanceOverlay=Math.max(0,Math.min(.95,Number(document.getElementById('visualBalanceOverlay').value)||0));
+                await db.ref('settings/visuals').set(v);visualSettingsCache=v;
+                ['visualFrameFile','visualWalletIconFile','visualBalanceBgFile'].forEach(id=>document.getElementById(id).value='');
+                msg.textContent='تم حفظ الإعدادات وتطبيقها على الموقع الرئيسي.';
+            }catch(e){msg.textContent='تعذر الحفظ: '+(e.message||dbErrorMessage(e));}finally{btn.disabled=false;}
+        }
+        async function resetVisualSettings(){if(!isAdminReady()||!confirm('استعادة الصور والمقاسات الافتراضية؟'))return;try{await db.ref('settings/visuals').remove();visualSettingsCache={};['visualFrameUrl','visualWalletIconUrl','visualBalanceBgUrl'].forEach(id=>document.getElementById(id).value='');document.getElementById('visualFrameWidth').value=75;document.getElementById('visualFrameHeight').value=75;document.getElementById('visualLogoWidth').value=61;document.getElementById('visualLogoHeight').value=61;document.getElementById('visualBalanceBgSize').value='cover';document.getElementById('visualBalanceOverlay').value='.76';document.getElementById('visualSettingsMsg').textContent='تمت استعادة الإعدادات الافتراضية.';}catch(e){alert('تعذر الاستعادة: '+dbErrorMessage(e));}}
+
         let currentVerifyCode = null;
 
         async function verifyCode() {
@@ -1755,6 +1804,8 @@
                 if (list) list.innerHTML = '<div class="request-empty" style="color:#fca5a5">تعذر تحميل طلبات الإيداع من قاعدة البيانات: ' + walletAdminEscape(dbErrorMessage(error)) + '<br>تأكد من صلاحيات قراءة wallet_deposits وأن الموقع والسيستم يستخدمان نفس مشروع Firebase.</div>';
             });
             safeListener(db.ref('wallet_orders'), renderWalletOrders);
+
+            safeListener(db.ref('settings/visuals'), snap => { loadVisualSettingsIntoForm(snap.val() || {}); });
 
             const logoRef = db.ref('settings/general/logo');
             safeListener(logoRef, snap => {
