@@ -358,7 +358,12 @@
                     </div>
                     <div><button class="action-btn" id="addBannerBtn" onclick="handleAddBanner()"><i class="fas fa-plus"></i> إضافة</button></div>
                 </div>
-                <div style="font-size:.78rem;color:#64748b;margin-top:8px;line-height:1.7">يدعم الصور الثابتة وGIF المتحرك. عند اختيار GIF يتم حفظه كما هو للحفاظ على الحركة؛ يُفضّل أن يكون حجمه أقل من 700 كيلوبايت عند الرفع المباشر لقاعدة البيانات. ويمكنك استخدام رابط صورة مباشر لتجنب تخزين ملفات كبيرة.</div>
+                <div class="row" style="margin-top:12px;align-items:end;gap:10px;flex-wrap:wrap">
+                    <div style="flex:1;min-width:130px"><label>مدة عرض الصورة الجديدة</label><input id="newBannerDuration" type="number" min="1" max="3600" value="5" step="1"></div>
+                    <div style="flex:1;min-width:130px"><label>الوحدة</label><select id="newBannerDurationUnit"><option value="seconds">ثوانٍ</option><option value="minutes">دقائق</option></select></div>
+                    <div style="flex:1;min-width:130px"><label>ترتيب البداية</label><input id="newBannerOrder" type="number" min="1" value=""></div>
+                </div>
+                <div style="font-size:.78rem;color:#64748b;margin-top:8px;line-height:1.7">كل صورة لها مدة وترتيب مستقلان. مدة العرض من ثانية واحدة إلى 60 دقيقة. يدعم الصور الثابتة وGIF المتحرك؛ GIF يحفظ كما هو دون فقد الحركة. يمكن الرفع من المعرض أو استخدام رابط مباشر.</div>
                 <div id="bannersList" style="margin-top: 15px;"></div>
             </div>
 
@@ -880,36 +885,52 @@
             dataListenersStarted = false;
         }
 
+        function bannerRecord(value, key, index) {
+            if (typeof value === 'string') return { key, url:value, durationMs:5000, order:index+1 };
+            value = value || {};
+            return { key, url:value.url || value.image || '', durationMs:Math.max(1000, Number(value.durationMs) || 5000), order:Number(value.order) || index+1 };
+        }
         function renderBanners(snap) {
             const list = document.getElementById('bannersList');
-            if (!list || !snap.exists()) {
-                if (list) list.innerHTML = '<div class="admin-card" style="justify-content:center;color:#94a3b8;">لا توجد صور أحداث مضافة.</div>';
-                return;
-            }
-
-            let html = '';
-            snap.forEach(c => {
-                const url = typeof c.val() === 'string' ? c.val() : '';
-                if (!url) return;
-                const safeUrl = String(url).replace(/"/g, '&quot;');
-                const displayUrl = url.length > 100 ? 'صورة مرفوعة من المعرض' : url.replace(/</g,'&lt;').replace(/>/g,'&gt;');
-                html += `<div class="admin-card">
-                    <img src="${safeUrl}" style="height:60px;max-width:140px;object-fit:contain;border-radius:10px;background:transparent!important;background-color:transparent!important;background-image:none!important;border:1px solid #cbd5e1;" onerror="this.src='https://via.placeholder.com/140x60?text=خطأ'">
-                    <div style="flex:1;margin:0 15px;font-size:.85rem;color:var(--text-light);word-break:break-all;direction:ltr;text-align:left;">${displayUrl}</div>
-                    <button class="btn-small btn-red" type="button" onclick="deleteBanner('${c.key}')"><i class="fas fa-trash"></i> حذف</button>
+            if (!list) return;
+            const records=[]; let i=0;
+            if (snap.exists()) snap.forEach(c => { const r=bannerRecord(c.val(),c.key,i++); if(r.url) records.push(r); });
+            records.sort((a,b)=>a.order-b.order || a.key.localeCompare(b.key));
+            if (!records.length) { list.innerHTML='<div class="admin-card" style="justify-content:center;color:#94a3b8;">لا توجد صور سلايدر مضافة.</div>'; return; }
+            list.innerHTML = records.map((r,idx) => {
+                const safeKey=String(r.key).replace(/[^A-Za-z0-9_-]/g,'');
+                const safeUrl=String(r.url).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+                const secs=Math.max(1,Math.round(r.durationMs/1000));
+                return `<div class="admin-card" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:10px">
+                    <img src="${safeUrl}" style="height:58px;width:105px;object-fit:contain;border-radius:9px;background:#0f172a;border:1px solid #cbd5e1" onerror="this.style.opacity='.35'">
+                    <div style="flex:1;min-width:130px;font-size:.8rem;color:var(--text-light)"><b>الصورة ${idx+1}</b><div style="direction:ltr;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:220px">${safeUrl.length>75?'صورة مضافة':safeUrl}</div></div>
+                    <label style="min-width:90px;flex:0 0 95px">الترتيب<input type="number" min="1" value="${r.order}" onchange="updateBannerMeta('${safeKey}','order',this.value)"></label>
+                    <label style="min-width:105px;flex:0 0 115px">المدة (ثانية)<input type="number" min="1" max="3600" value="${secs}" onchange="updateBannerMeta('${safeKey}','durationMs',this.value)"></label>
+                    <button class="btn-small btn-red" type="button" onclick="deleteBanner('${safeKey}')"><i class="fas fa-trash"></i> حذف</button>
                 </div>`;
-            });
-            list.innerHTML = html || '<div class="admin-card" style="justify-content:center;color:#94a3b8;">لا توجد صور أحداث مضافة.</div>';
+            }).join('');
         }
-
-        async function deleteBanner(key) {
-            if (!key || !confirm('هل أنت متأكد من حذف هذا الحدث؟')) return;
+        async function updateBannerMeta(key, field, rawValue) {
+            if (!key || !['order','durationMs'].includes(field)) return;
             if (!isAdminReady()) return alert('يجب تسجيل الدخول أولاً.');
+            let value=Number(rawValue);
+            if (!Number.isFinite(value) || value<1) return alert('أدخل رقمًا صحيحًا أكبر من صفر.');
+            if (field==='durationMs') { value=Math.min(3600,value)*1000; }
             try {
-                await db.ref('settings/banners/' + key).remove();
-            } catch (e) {
-                alert('تعذر حذف الصورة: ' + dbErrorMessage(e));
-            }
+                const ref=db.ref('settings/banners/'+key);
+                const snap=await ref.once('value');
+                if (!snap.exists()) return;
+                const old=snap.val();
+                const record=typeof old==='string'?{url:old,durationMs:5000,order:1}:{...old};
+                record[field]=value;
+                await writeAndVerify(ref,record);
+            } catch(e) { alert('تعذر تحديث إعداد الصورة: '+dbErrorMessage(e)); }
+        }
+        async function deleteBanner(key) {
+            if (!key || !confirm('هل أنت متأكد من حذف هذه الصورة؟')) return;
+            if (!isAdminReady()) return alert('يجب تسجيل الدخول أولاً.');
+            try { await db.ref('settings/banners/' + key).remove(); }
+            catch (e) { alert('تعذر حذف الصورة: ' + dbErrorMessage(e)); }
         }
 
         async function handleSaveLogo() {
@@ -962,12 +983,20 @@
                         ? await readImageOriginal(selectedFile)
                         : await compressAndEncodeImage(selectedFile, 1000);
                 }
+                const durationInput=document.getElementById('newBannerDuration');
+                const durationUnit=document.getElementById('newBannerDurationUnit').value;
+                const durationLimit=durationUnit==='minutes'?60:3600;
+                const rawDuration=Math.max(1,Math.min(durationLimit,Number(durationInput.value)||5));
+                const durationMs=rawDuration*(durationUnit==='minutes'?60000:1000);
+                const orderInput=document.getElementById('newBannerOrder');
+                const current=await db.ref('settings/banners').once('value');
+                const nextOrder=orderInput.value ? Math.max(1,Number(orderInput.value)) : current.numChildren()+1;
                 const newBannerRef = db.ref('settings/banners').push();
-                await newBannerRef.set(value);
-                const bannerCheck = await newBannerRef.once('value');
-                if (!bannerCheck.exists() || bannerCheck.val() !== value) throw new Error('لم يتم تأكيد حفظ صورة السلايدر.');
+                const record={url:value,durationMs,order:nextOrder};
+                await writeAndVerify(newBannerRef,record);
                 fileInput.value = '';
                 document.getElementById('newBannerUrl').value = '';
+                orderInput.value='';
             } catch (e) {
                 alert('حدث خطأ أثناء حفظ الصورة: ' + dbErrorMessage(e));
             } finally {
