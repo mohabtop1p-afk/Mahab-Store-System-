@@ -353,12 +353,26 @@
                     <div style="flex:3;">
                         <input type="url" id="newBannerUrl" placeholder="رابط الحدث (أو اختر من المعرض أسفله)">
                         <div class="file-upload-wrapper">
-                            <input type="file" id="newBannerFile" accept="image/*" class="file-input">
+                            <input type="file" id="newBannerFile" accept="image/*,.gif" class="file-input">
                         </div>
                     </div>
                     <div><button class="action-btn" id="addBannerBtn" onclick="handleAddBanner()"><i class="fas fa-plus"></i> إضافة</button></div>
                 </div>
+                <div style="font-size:.78rem;color:#64748b;margin-top:8px;line-height:1.7">يدعم الصور الثابتة وGIF المتحرك. عند اختيار GIF يتم حفظه كما هو للحفاظ على الحركة؛ يُفضّل أن يكون حجمه أقل من 700 كيلوبايت عند الرفع المباشر لقاعدة البيانات. ويمكنك استخدام رابط صورة مباشر لتجنب تخزين ملفات كبيرة.</div>
                 <div id="bannersList" style="margin-top: 15px;"></div>
+            </div>
+
+            <div class="form-section" style="border-top:4px solid #2563eb">
+                <h3><i class="fas fa-flag" style="color:#2563eb"></i> أعلام تغيير العملة في الشريط العلوي</h3>
+                <p style="color:#64748b;line-height:1.8">غيّر علم الجنيه المصري وعلم الدولار الأمريكي الظاهرين بجوار زر تبديل العملة. يمكنك رفع الصورة من معرض الهاتف أو وضع رابط مباشر لكل علم.</p>
+                <div class="row">
+                    <div style="flex:1;min-width:220px"><label>علم مصر (الجنيه المصري)</label><input type="url" id="currencyEgpFlagUrl" placeholder="رابط صورة علم مصر"><input type="file" id="currencyEgpFlagFile" accept="image/*" class="file-input"></div>
+                    <div style="flex:1;min-width:220px"><label>علم أمريكا (الدولار)</label><input type="url" id="currencyUsdFlagUrl" placeholder="رابط صورة علم أمريكا"><input type="file" id="currencyUsdFlagFile" accept="image/*" class="file-input"></div>
+                </div>
+                <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin:12px 0"><img id="currencyEgpFlagPreview" alt="معاينة علم مصر" style="width:58px;height:40px;object-fit:cover;border-radius:7px;border:1px solid #cbd5e1"><img id="currencyUsdFlagPreview" alt="معاينة علم أمريكا" style="width:58px;height:40px;object-fit:cover;border-radius:7px;border:1px solid #cbd5e1"></div>
+                <button class="action-btn" type="button" id="saveCurrencyFlagsBtn" onclick="saveCurrencyFlags()"><i class="fas fa-save"></i> حفظ أعلام العملة</button>
+                <button class="btn-small btn-yellow" type="button" style="width:100%;margin-top:10px" onclick="resetCurrencyFlags()">استعادة الأعلام الافتراضية</button>
+                <div id="currencyFlagsMsg" style="margin-top:10px;color:#047857;font-size:.85rem"></div>
             </div>
 
             <div class="form-section">
@@ -924,6 +938,12 @@
             }
         }
 
+        async function readImageOriginal(file, maxBytes = 700 * 1024) {
+            if (!file || !file.type || !file.type.startsWith('image/')) throw new Error('اختر ملف صورة صحيحًا.');
+            if (file.size > maxBytes) throw new Error('حجم الملف كبير للرفع المباشر إلى قاعدة البيانات. استخدم رابطًا مباشرًا أو اختر ملفًا أصغر من 700 كيلوبايت.');
+            return await new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(String(r.result));r.onerror=()=>reject(new Error('تعذرت قراءة الصورة من المعرض.'));r.readAsDataURL(file);});
+        }
+
         async function handleAddBanner() {
             const fileInput = document.getElementById('newBannerFile');
             const urlInput = document.getElementById('newBannerUrl').value.trim();
@@ -935,7 +955,13 @@
             btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> جاري الحفظ...';
             try {
                 let value = urlInput;
-                if (fileInput.files.length) value = await compressAndEncodeImage(fileInput.files[0], 1000);
+                if (fileInput.files.length) {
+                    const selectedFile = fileInput.files[0];
+                    // GIF لا يمر عبر Canvas حتى لا نفقد الحركة والإطارات المتتابعة.
+                    value = selectedFile.type === 'image/gif'
+                        ? await readImageOriginal(selectedFile)
+                        : await compressAndEncodeImage(selectedFile, 1000);
+                }
                 const newBannerRef = db.ref('settings/banners').push();
                 await newBannerRef.set(value);
                 const bannerCheck = await newBannerRef.once('value');
@@ -1428,6 +1454,46 @@
         }
         async function resetVisualSettings(){if(!isAdminReady()||!confirm('استعادة الصور والمقاسات الافتراضية؟'))return;try{await db.ref('settings/visuals').remove();visualSettingsCache={};['visualFrameUrl','visualWalletIconUrl','visualBalanceBgUrl'].forEach(id=>document.getElementById(id).value='');document.getElementById('visualFrameWidth').value=75;document.getElementById('visualFrameHeight').value=75;document.getElementById('visualLogoWidth').value=61;document.getElementById('visualLogoHeight').value=61;document.getElementById('visualBalanceBgSize').value='cover';document.getElementById('visualBalanceOverlay').value='.76';document.getElementById('visualSettingsMsg').textContent='تمت استعادة الإعدادات الافتراضية.';}catch(e){alert('تعذر الاستعادة: '+dbErrorMessage(e));}}
 
+        let currencyFlagsCache = {};
+        async function loadCurrencyFlagsForm(v){
+            currencyFlagsCache=v||{};
+            const egp=document.getElementById('currencyEgpFlagUrl'),usd=document.getElementById('currencyUsdFlagUrl');
+            if(egp)egp.value=currencyFlagsCache.EGP||'';
+            if(usd)usd.value=currencyFlagsCache.USD||'';
+            const ep=document.getElementById('currencyEgpFlagPreview'),up=document.getElementById('currencyUsdFlagPreview');
+            if(ep&&currencyFlagsCache.EGP)ep.src=currencyFlagsCache.EGP;
+            if(up&&currencyFlagsCache.USD)up.src=currencyFlagsCache.USD;
+        }
+        async function saveCurrencyFlags(){
+            if(!isAdminReady())return alert('يجب تسجيل الدخول أولاً.');
+            const btn=document.getElementById('saveCurrencyFlagsBtn'),msg=document.getElementById('currencyFlagsMsg');btn.disabled=true;
+            try{
+                const v={...currencyFlagsCache};
+                for(const [key,urlId,fileId] of [['EGP','currencyEgpFlagUrl','currencyEgpFlagFile'],['USD','currencyUsdFlagUrl','currencyUsdFlagFile']]){
+                    const url=document.getElementById(urlId).value.trim();
+                    if(url)v[key]=url;
+                    const file=document.getElementById(fileId).files?.[0];
+                    if(file)v[key]=await readImageOriginal(file,700*1024);
+                }
+                if(!v.EGP&&!v.USD)throw new Error('أدخل رابطًا أو اختر صورة لعلم واحد على الأقل.');
+                await db.ref('settings/currencyFlags').set(v);
+                const check=await db.ref('settings/currencyFlags').once('value');
+                if(!check.exists())throw new Error('لم يتم تأكيد حفظ الأعلام.');
+                currencyFlagsCache=v;
+                const ep=document.getElementById('currencyEgpFlagPreview'),up=document.getElementById('currencyUsdFlagPreview');
+                if(ep&&v.EGP)ep.src=v.EGP;if(up&&v.USD)up.src=v.USD;
+                ['currencyEgpFlagFile','currencyUsdFlagFile'].forEach(id=>document.getElementById(id).value='');
+                msg.textContent='تم حفظ الأعلام بنجاح، وستظهر في زر تغيير العملة بالموقع.';
+            }catch(e){msg.textContent='تعذر الحفظ: '+(e.message||dbErrorMessage(e));}
+            finally{btn.disabled=false;}
+        }
+        async function resetCurrencyFlags(){
+            if(!isAdminReady()||!confirm('استعادة علمي العملة الافتراضيين؟'))return;
+            try{await db.ref('settings/currencyFlags').remove();currencyFlagsCache={};document.getElementById('currencyEgpFlagUrl').value='';document.getElementById('currencyUsdFlagUrl').value='';document.getElementById('currencyEgpFlagPreview').src='';document.getElementById('currencyUsdFlagPreview').src='';document.getElementById('currencyFlagsMsg').textContent='تمت استعادة الأعلام الافتراضية.';}
+            catch(e){alert('تعذرت استعادة الأعلام: '+dbErrorMessage(e));}
+        }
+        document.addEventListener('change',e=>{if(e.target?.id==='currencyEgpFlagFile'){const f=e.target.files?.[0];if(f)document.getElementById('currencyEgpFlagPreview').src=URL.createObjectURL(f);}if(e.target?.id==='currencyUsdFlagFile'){const f=e.target.files?.[0];if(f)document.getElementById('currencyUsdFlagPreview').src=URL.createObjectURL(f);}});
+
         let currentVerifyCode = null;
 
         async function verifyCode() {
@@ -1806,6 +1872,7 @@
             safeListener(db.ref('wallet_orders'), renderWalletOrders);
 
             safeListener(db.ref('settings/visuals'), snap => { loadVisualSettingsIntoForm(snap.val() || {}); });
+            safeListener(db.ref('settings/currencyFlags'), snap => { loadCurrencyFlagsForm(snap.val() || {}); });
 
             const logoRef = db.ref('settings/general/logo');
             safeListener(logoRef, snap => {
