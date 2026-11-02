@@ -480,8 +480,24 @@
                 
                 <div id="externalFields" style="display:none;padding:16px;margin-bottom:18px;border:1px dashed var(--primary);border-radius:14px;background:#f0f9ff;">
                     <label>رابط الموقع الخارجي (يبدأ بـ https://):</label>
-                    <input type="url" id="gExternalUrl" placeholder="https://example.com">
-                    <p style="font-size:.8rem;color:#64748b;line-height:1.7;margin-top:8px">سيظهر كعنصر مستقل في شبكة الموقع. يمكن إخفاء الرابط من الواجهة، لكن الترميز ليس تشفيراً أمنياً ولا يخفيه عن أدوات المطور.</p>
+                    <input type="url" id="gExternalUrl" placeholder="https://example.com" inputmode="url" autocomplete="url">
+                    <div class="row" style="margin-top:12px;align-items:end">
+                        <div style="flex:2;min-width:220px">
+                            <label>طريقة عرض الرابط للعميل</label>
+                            <select id="gExternalMode">
+                                <option value="embed">داخل صفحة من MOHAB STORE (إطار مضمّن)</option>
+                                <option value="redirect">فتح الرابط الخارجي مباشرة</option>
+                                <option value="newtab">فتح في تبويب جديد</option>
+                            </select>
+                        </div>
+                        <div style="flex:1;min-width:180px">
+                            <label>عنوان صفحة العرض (اختياري)</label>
+                            <input type="text" id="gExternalTitle" placeholder="مثال: قائمة أسعار خاصة">
+                        </div>
+                    </div>
+                    <div style="margin-top:12px;padding:12px;border-radius:10px;background:#fff;border:1px solid #bfdbfe;color:#475569;font-size:.82rem;line-height:1.8">
+                        <strong style="color:#075985">مهم:</strong> وضع «داخل صفحة من MOHAB STORE» يحتاج أن يدعم الموقع الرئيسي عرض هذا العنصر داخل iframe. بعض المواقع تمنع التضمين؛ عندها لن تظهر داخل الصفحة ويلزم اختيار فتح الرابط مباشرة. ترميز الرابط ليس تشفيراً أمنياً ولا يخفيه عن أدوات المطور.
+                    </div>
                 </div>
                 <div class="row" id="priceIconFields">
                     <div><label>أيقونة باقات الأسعار (رابط صورة اختياري):</label><input type="url" id="gPriceIcon" placeholder="https://.../icon.png"></div>
@@ -1282,7 +1298,9 @@
                     img:finalImgUrl,
                     kind,
                     external_url: kind === 'external' ? externalUrl : '',
-                    external_url_b64: kind === 'external' ? btoa(externalUrl) : '',
+                    external_url_b64: kind === 'external' ? btoa(unescape(encodeURIComponent(externalUrl))) : '',
+                    external_mode: kind === 'external' ? (document.getElementById('gExternalMode').value || 'embed') : '',
+                    external_title: kind === 'external' ? document.getElementById('gExternalTitle').value.trim() : '',
                     price_icon: finalPriceIcon,
                     package_icons: packageIcons,
                     order:parseInt(document.getElementById('gOrder').value,10) || 99,
@@ -1320,6 +1338,8 @@
             document.getElementById('gName').value = g.name || '';
             document.getElementById('gKind').value = g.kind || 'prices';
             document.getElementById('gExternalUrl').value = g.external_url || '';
+            document.getElementById('gExternalMode').value = g.external_mode || 'embed';
+            document.getElementById('gExternalTitle').value = g.external_title || '';
             document.getElementById('gPriceIcon').value = (g.price_icon && g.price_icon.length < 200) ? g.price_icon : '';
             document.getElementById('gPriceIconFile').value = '';
             toggleExternalFields();
@@ -1348,8 +1368,9 @@
             editingGameId = null;
             document.getElementById('saveGameBtn').innerHTML = "<i class='fas fa-cloud-upload-alt'></i> حفظ المنتج في السيستم";
             document.getElementById('cancelEditBtn').style.display = 'none';
-            ['gName','gImg','gIdPrices','gAccPrices','gIdPricesUsd','gAccPricesUsd','gImgFile','gExternalUrl','gPriceIcon','gPriceIconFile']
+            ['gName','gImg','gIdPrices','gAccPrices','gIdPricesUsd','gAccPricesUsd','gImgFile','gExternalUrl','gExternalTitle','gPriceIcon','gPriceIconFile']
                 .forEach(id => { document.getElementById(id).value = ''; });
+            document.getElementById('gExternalMode').value = 'embed';
             document.getElementById('gOrder').value = '1';
             document.getElementById('gIdAvail').checked = false;
             document.getElementById('gAccAvail').checked = false;
