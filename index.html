@@ -1170,26 +1170,43 @@
             catch (e) { alert('تعذر حذف المنتج: ' + dbErrorMessage(e)); }
         }
 
-        function addCustomMethodUI(name = '', prices = '', pricesUsd = '') {
+        function addCustomMethodUI(name = '', prices = '', pricesUsd = '', methodType = 'prices', externalUrl = '') {
             const container = document.getElementById('customMethodsContainer');
             const div = document.createElement('div');
             div.className = 'custom-method-item';
-
-            const title = String(name).replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-            const egp = String(prices).replace(/</g,'&lt;').replace(/>/g,'&gt;');
-            const usd = String(pricesUsd).replace(/</g,'&lt;').replace(/>/g,'&gt;');
-
+            const safe = value => String(value == null ? '' : value).replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
             div.innerHTML = `
                 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px;">
                     <label style="margin:0;font-size:1.1rem;color:var(--primary);">إعدادات الطريقة</label>
-                    <button class="btn-small btn-red" type="button" onclick="this.parentElement.parentElement.remove()"><i class="fas fa-trash"></i> حذف</button>
+                    <button class="btn-small btn-red" type="button" onclick="this.closest('.custom-method-item').remove()"><i class="fas fa-trash"></i> حذف</button>
                 </div>
-                <input type="text" class="cm-name" placeholder="اسم الطريقة (مثل: عن طريق رقم الموبايل)" value="${title}" style="margin-bottom:15px;">
-                <div class="row">
-                    <div><label>الأسعار (بالمصري):</label><textarea class="cm-prices" placeholder="مثال: باقة فليكس = 50 ج">${egp}</textarea></div>
-                    <div><label>الأسعار (بالدولار):</label><textarea class="cm-prices-usd">${usd}</textarea></div>
+                <input type="text" class="cm-name" placeholder="اسم الطريقة (مثل: عن طريق رقم الموبايل)" value="${safe(name)}" style="margin-bottom:15px;">
+                <label>نوع الطريقة</label>
+                <select class="cm-type" onchange="toggleCustomMethodFields(this)" style="margin-bottom:15px">
+                    <option value="prices">قائمة أسعار عادية</option>
+                    <option value="external">فتح موقع خارجي داخل MOHAB STORE</option>
+                </select>
+                <div class="cm-external-fields" style="display:none;padding:14px;border:1px dashed var(--primary);border-radius:12px;background:#f0f9ff;margin-bottom:12px">
+                    <label>رابط الموقع الخارجي (HTTPS)</label>
+                    <input type="url" class="cm-external-url" placeholder="https://example.com" value="${safe(externalUrl)}">
+                    <small style="display:block;color:#64748b;line-height:1.7;margin-top:7px">سيُفتح داخل صفحة من المتجر، وسيكون له رابط مشاركة مستقل. بعض المواقع تمنع العرض داخل إطار.</small>
+                </div>
+                <div class="cm-price-fields">
+                    <div class="row">
+                        <div><label>الأسعار (بالمصري):</label><textarea class="cm-prices" placeholder="مثال: باقة فليكس = 50 ج">${safe(prices)}</textarea></div>
+                        <div><label>الأسعار (بالدولار):</label><textarea class="cm-prices-usd">${safe(pricesUsd)}</textarea></div>
+                    </div>
                 </div>`;
             container.appendChild(div);
+            div.querySelector('.cm-type').value = methodType === 'external' ? 'external' : 'prices';
+            toggleCustomMethodFields(div.querySelector('.cm-type'));
+        }
+
+        function toggleCustomMethodFields(select) {
+            const card = select.closest('.custom-method-item');
+            const external = select.value === 'external';
+            card.querySelector('.cm-external-fields').style.display = external ? 'block' : 'none';
+            card.querySelector('.cm-price-fields').style.display = external ? 'none' : 'block';
         }
 
         function getPackageNamesForIcons() {
@@ -1274,11 +1291,19 @@
                 const custom_methods = [];
                 document.querySelectorAll('.custom-method-item').forEach(item => {
                     const mName = item.querySelector('.cm-name').value.trim();
-                    if (mName) custom_methods.push({
-                        name:mName,
-                        prices:item.querySelector('.cm-prices').value,
-                        prices_usd:item.querySelector('.cm-prices-usd').value
-                    });
+                    if (mName) {
+                        const methodType = item.querySelector('.cm-type')?.value || 'prices';
+                        const methodUrl = (item.querySelector('.cm-external-url')?.value || '').trim();
+                        if (methodType === 'external' && !/^https:\/\//i.test(methodUrl)) throw new Error('أدخل رابط HTTPS صحيح لطريقة الشحن: ' + mName);
+                        custom_methods.push({
+                            name:mName,
+                            type:methodType,
+                            external_url:methodType === 'external' ? methodUrl : '',
+                            external_url_b64:methodType === 'external' ? btoa(unescape(encodeURIComponent(methodUrl))) : '',
+                            prices:methodType === 'prices' ? (item.querySelector('.cm-prices')?.value || '') : '',
+                            prices_usd:methodType === 'prices' ? (item.querySelector('.cm-prices-usd')?.value || '') : ''
+                        });
+                    }
                 });
 
                 // الاحتفاظ بالأيقونات المخصصة القديمة ثم تحديث الصفوف التي أدخلها المستخدم.
@@ -1330,6 +1355,10 @@
             }
         }
 
+        function decodeExternalMethodUrl(encoded) {
+            try { return encoded ? decodeURIComponent(escape(atob(encoded))) : ''; } catch (_) { return ''; }
+        }
+
         function editGame(id) {
             if (!globalGames[id]) return alert('المنتج غير موجود أو تم حذفه.');
             editingGameId = id;
@@ -1355,7 +1384,7 @@
 
             document.getElementById('customMethodsContainer').innerHTML = '';
             if (Array.isArray(g.custom_methods)) {
-                g.custom_methods.forEach(cm => addCustomMethodUI(cm.name, cm.prices, cm.prices_usd));
+                g.custom_methods.forEach(cm => addCustomMethodUI(cm.name, cm.prices, cm.prices_usd, cm.type || 'prices', cm.external_url || decodeExternalMethodUrl(cm.external_url_b64)));
             }
             refreshPackageIconRows(g.package_icons || {});
 
