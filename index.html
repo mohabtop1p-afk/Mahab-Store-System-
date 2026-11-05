@@ -298,6 +298,13 @@
         .wallet-admin-card .btn-group{flex-wrap:wrap}
         @media(max-width:600px){.wallet-admin-actions .btn-small{flex:1}.wallet-admin-card{padding:14px}}
 
+    
+        .wallet-login-gif-preview{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-top:12px;padding:14px;background:#f8fafc;border:1px solid #dbe3ec;border-radius:14px}
+        .wallet-login-gif-preview img{width:92px;height:92px;object-fit:contain;border-radius:18px;background:linear-gradient(135deg,#e0f2fe,#eff6ff);border:1px solid #bfdbfe}
+        .notification-settings-note{padding:12px 14px;border-radius:12px;background:#eff6ff;border:1px solid #bfdbfe;color:#1e40af;font-size:.84rem;line-height:1.8;margin:10px 0 14px}
+        #adminNotificationToast{position:fixed;right:16px;bottom:90px;z-index:100000;display:none;max-width:min(390px,calc(100vw - 32px));padding:14px 16px;border-radius:14px;background:#0f172a;color:#fff;box-shadow:0 14px 35px rgba(15,23,42,.25);border:1px solid rgba(14,165,233,.35);line-height:1.7}
+        #adminNotificationToast.show{display:block;animation:slideUp .2s ease}
+
     </style>
 </head>
 <body>
@@ -317,6 +324,7 @@
         <span id="adminUserEmail"></span>
         <button type="button" onclick="signOutAdmin()"><i class="fas fa-sign-out-alt"></i> خروج</button>
     </div>
+    <div id="adminNotificationToast" role="status" aria-live="polite"></div>
 
     <div id="adminApp" aria-hidden="true">
     <!-- شريط التنقل -->
@@ -347,6 +355,13 @@
                 </div>
             </div>
             
+            <div class="form-section" style="border-top:4px solid #0ea5e9">
+                <h3><i class="fas fa-bell" style="color:#0ea5e9"></i> إشعارات الطلبات على هذا الجهاز</h3>
+                <p class="notification-settings-note">فعّل الإشعارات للسماح للمتصفح بعرض تنبيه عند وصول طلب لعبة أو إيداع أو طلب شحن جديد. يجب السماح بالإشعارات من إعدادات المتصفح، وأن تكون لوحة التحكم مفتوحة لاستقبال تنبيهات Firebase المباشرة.</p>
+                <button class="action-btn" type="button" id="enableAdminNotificationsBtn" onclick="enableAdminBrowserNotifications()"><i class="fas fa-bell"></i> تفعيل إشعارات المتصفح</button>
+                <div id="adminNotificationPermissionStatus" style="margin-top:10px;font-size:.84rem;color:#64748b" aria-live="polite">لم يتم طلب الإذن بعد.</div>
+            </div>
+
             <div class="form-section">
                 <h3>صور الإشعارات / البانرات المتحركة <i class="fas fa-images" style="color:var(--primary);"></i></h3>
                 <div class="row">
@@ -454,6 +469,13 @@
                 <div class="row"><div><label>عرض صورة اللعبة داخل الإطار (px)</label><input type="number" id="visualLogoWidth" min="10" max="250" value="61"></div><div><label>ارتفاع صورة اللعبة داخل الإطار (px)</label><input type="number" id="visualLogoHeight" min="10" max="250" value="61"></div></div>
                 <hr style="border:0;border-top:1px solid #e2e8f0;margin:20px 0">
                 <div class="row"><div style="flex:2"><label>صورة أيقونة المحفظة في الشريط العلوي:</label><input type="url" id="visualWalletIconUrl" placeholder="رابط صورة الأيقونة"><input type="file" id="visualWalletIconFile" accept="image/*" class="file-input"></div></div>
+                <div style="margin:14px 0;padding:16px;border:1px solid #bae6fd;border-radius:15px;background:#f0f9ff">
+                    <h4 style="margin:0 0 8px;color:#075985"><i class="fas fa-film"></i> أيقونة GIF أعلى تسجيل دخول المحفظة</h4>
+                    <label>رابط GIF مباشر (اختياري)</label><input type="url" id="visualWalletLoginGifUrl" placeholder="https://example.com/wallet-animation.gif">
+                    <label style="margin-top:10px">أو ارفع GIF من الهاتف</label><input type="file" id="visualWalletLoginGifFile" accept="image/gif" class="file-input">
+                    <div class="row" style="margin-top:10px"><div><label>العرض بالبكسل</label><input type="number" id="visualWalletLoginGifWidth" min="40" max="180" value="92"></div><div><label>الارتفاع بالبكسل</label><input type="number" id="visualWalletLoginGifHeight" min="40" max="180" value="92"></div></div>
+                    <div class="wallet-login-gif-preview"><img id="visualWalletLoginGifPreview" alt="معاينة أيقونة GIF" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='92' height='92'%3E%3Crect width='92' height='92' rx='18' fill='%23e0f2fe'/%3E%3Ctext x='46' y='55' font-size='32' text-anchor='middle'%3E%E2%9C%A8%3C/text%3E%3C/svg%3E"><span style="color:#475569;font-size:.82rem;line-height:1.8">ستظهر الأيقونة أعلى زر تسجيل الدخول في صفحة المحفظة. اترك الرابط والملف فارغين لإظهار الأيقونة الافتراضية.</span></div>
+                </div>
                 <div class="row"><div style="flex:2"><label>خلفية مربع الرصيد داخل المحفظة:</label><input type="url" id="visualBalanceBgUrl" placeholder="رابط صورة الخلفية"><input type="file" id="visualBalanceBgFile" accept="image/*" class="file-input"></div></div>
                 <div class="row"><div><label>طريقة ملاءمة خلفية الرصيد</label><select id="visualBalanceBgSize"><option value="cover">ملء المربع (Cover)</option><option value="contain">إظهار الصورة كاملة (Contain)</option></select></div><div><label>عتامة الطبقة الداكنة (0 إلى 0.95)</label><input type="number" id="visualBalanceOverlay" min="0" max="0.95" step="0.05" value="0.76"></div></div>
                 <button class="action-btn" type="button" id="saveVisualSettingsBtn" onclick="saveVisualSettings()"><i class="fas fa-save"></i> حفظ وتطبيق التخصيصات</button>
@@ -1512,8 +1534,10 @@
         }
         async function loadVisualSettingsIntoForm(v){
             visualSettingsCache=v||{};
-            const map={visualFrameUrl:'frameUrl',visualFrameWidth:'frameWidth',visualFrameHeight:'frameHeight',visualLogoWidth:'logoWidth',visualLogoHeight:'logoHeight',visualWalletIconUrl:'walletIconUrl',visualBalanceBgUrl:'balanceBgUrl',visualBalanceBgSize:'balanceBgSize',visualBalanceOverlay:'balanceOverlay'};
+            const map={visualFrameUrl:'frameUrl',visualFrameWidth:'frameWidth',visualFrameHeight:'frameHeight',visualLogoWidth:'logoWidth',visualLogoHeight:'logoHeight',visualWalletIconUrl:'walletIconUrl',visualWalletLoginGifUrl:'walletLoginGifUrl',visualWalletLoginGifWidth:'walletLoginGifWidth',visualWalletLoginGifHeight:'walletLoginGifHeight',visualBalanceBgUrl:'balanceBgUrl',visualBalanceBgSize:'balanceBgSize',visualBalanceOverlay:'balanceOverlay'};
             Object.entries(map).forEach(([id,key])=>{const el=document.getElementById(id);if(el && visualSettingsCache[key]!==undefined)el.value=visualSettingsCache[key];});
+            const preview=document.getElementById('visualWalletLoginGifPreview');
+            if(preview && visualSettingsCache.walletLoginGifUrl) preview.src=visualSettingsCache.walletLoginGifUrl;
         }
         async function saveVisualSettings(){
             if(!isAdminReady())return alert('يجب تسجيل الدخول أولاً.');
@@ -1525,15 +1549,27 @@
                 const frameFile=await readVisualImage('visualFrameFile'); if(frameFile)v.frameUrl=frameFile;
                 const iconFile=await readVisualImage('visualWalletIconFile'); if(iconFile)v.walletIconUrl=iconFile;
                 const bgFile=await readVisualImage('visualBalanceBgFile'); if(bgFile)v.balanceBgUrl=bgFile;
+                const gifUrl=document.getElementById('visualWalletLoginGifUrl').value.trim();
+                if(gifUrl) v.walletLoginGifUrl=gifUrl;
+                else if(!document.getElementById('visualWalletLoginGifFile').files?.length && document.getElementById('visualWalletLoginGifUrl').dataset.clear==='1') delete v.walletLoginGifUrl;
+                const gifInput=document.getElementById('visualWalletLoginGifFile');
+                const gifFile=gifInput.files?.[0];
+                if(gifFile){
+                    if(gifFile.type!=='image/gif') throw new Error('اختر ملف GIF متحركًا بصيغة GIF.');
+                    if(gifFile.size>180*1024) throw new Error('حجم GIF كبير. استخدم رابطًا مباشرًا أو ملفًا أقل من 180 كيلوبايت.');
+                    v.walletLoginGifUrl=await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(String(reader.result));reader.onerror=()=>reject(new Error('تعذرت قراءة ملف GIF.'));reader.readAsDataURL(gifFile);});
+                }
                 for(const [key,id,min,max] of [['frameWidth','visualFrameWidth',20,300],['frameHeight','visualFrameHeight',20,300],['logoWidth','visualLogoWidth',10,250],['logoHeight','visualLogoHeight',10,250]]){const n=Number(document.getElementById(id).value);if(!Number.isFinite(n)||n<min||n>max)throw new Error('راجع مقاسات الإطار والصورة؛ القيم خارج النطاق المسموح.');v[key]=n;}
+                v.walletLoginGifWidth=Math.max(40,Math.min(180,Number(document.getElementById('visualWalletLoginGifWidth').value)||92));
+                v.walletLoginGifHeight=Math.max(40,Math.min(180,Number(document.getElementById('visualWalletLoginGifHeight').value)||92));
                 v.balanceBgSize=document.getElementById('visualBalanceBgSize').value;
                 v.balanceOverlay=Math.max(0,Math.min(.95,Number(document.getElementById('visualBalanceOverlay').value)||0));
                 await db.ref('settings/visuals').set(v);visualSettingsCache=v;
-                ['visualFrameFile','visualWalletIconFile','visualBalanceBgFile'].forEach(id=>document.getElementById(id).value='');
+                ['visualFrameFile','visualWalletIconFile','visualBalanceBgFile','visualWalletLoginGifFile'].forEach(id=>document.getElementById(id).value='');
                 msg.textContent='تم حفظ الإعدادات وتطبيقها على الموقع الرئيسي.';
             }catch(e){msg.textContent='تعذر الحفظ: '+(e.message||dbErrorMessage(e));}finally{btn.disabled=false;}
         }
-        async function resetVisualSettings(){if(!isAdminReady()||!confirm('استعادة الصور والمقاسات الافتراضية؟'))return;try{await db.ref('settings/visuals').remove();visualSettingsCache={};['visualFrameUrl','visualWalletIconUrl','visualBalanceBgUrl'].forEach(id=>document.getElementById(id).value='');document.getElementById('visualFrameWidth').value=75;document.getElementById('visualFrameHeight').value=75;document.getElementById('visualLogoWidth').value=61;document.getElementById('visualLogoHeight').value=61;document.getElementById('visualBalanceBgSize').value='cover';document.getElementById('visualBalanceOverlay').value='.76';document.getElementById('visualSettingsMsg').textContent='تمت استعادة الإعدادات الافتراضية.';}catch(e){alert('تعذر الاستعادة: '+dbErrorMessage(e));}}
+        async function resetVisualSettings(){if(!isAdminReady()||!confirm('استعادة الصور والمقاسات الافتراضية؟'))return;try{await db.ref('settings/visuals').remove();visualSettingsCache={};['visualFrameUrl','visualWalletIconUrl','visualWalletLoginGifUrl','visualBalanceBgUrl'].forEach(id=>document.getElementById(id).value='');document.getElementById('visualWalletLoginGifFile').value='';document.getElementById('visualWalletLoginGifPreview').src='data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'92\' height=\'92\'%3E%3Crect width=\'92\' height=\'92\' rx=\'18\' fill=\'%23e0f2fe\'/%3E%3Ctext x=\'46\' y=\'55\' font-size=\'32\' text-anchor=\'middle\'%3E%E2%9C%A8%3C/text%3E%3C/svg%3E';document.getElementById('visualWalletLoginGifWidth').value=92;document.getElementById('visualWalletLoginGifHeight').value=92;document.getElementById('visualFrameWidth').value=75;document.getElementById('visualFrameHeight').value=75;document.getElementById('visualLogoWidth').value=61;document.getElementById('visualLogoHeight').value=61;document.getElementById('visualBalanceBgSize').value='cover';document.getElementById('visualBalanceOverlay').value='.76';document.getElementById('visualSettingsMsg').textContent='تمت استعادة الإعدادات الافتراضية.';}catch(e){alert('تعذر الاستعادة: '+dbErrorMessage(e));}}
 
         let currencyFlagsCache = {};
         async function loadCurrencyFlagsForm(v){
@@ -1938,6 +1974,96 @@
         function renderWalletUsers(){const box=document.getElementById('walletUsersList');if(!box)return;const q=(document.getElementById('walletUserSearch')?.value||'').toLowerCase().trim();const rows=Object.entries(walletUsersAdminCache).filter(([uid,u])=>[uid,u.email,u.displayName,u.userCode].some(v=>String(v||'').toLowerCase().includes(q)));if(!rows.length){box.innerHTML='<div class="request-empty">لا يوجد مستخدمون مطابقون. لا تظهر إلا الحسابات التي سجلت دخولها إلى المحفظة وتم حفظ بياناتها.</div>';return;}box.innerHTML=rows.map(([uid,u])=>`<div class="admin-card wallet-admin-card"><div class="wallet-admin-card-top"><div><strong>${walletAdminEscape(u.displayName||'مستخدم المحفظة')}</strong><div class="wallet-admin-meta">${walletAdminEscape(u.email||'البريد غير متوفر')}</div><div class="wallet-admin-meta">الكود: <b>${walletAdminEscape(u.userCode||uid.slice(0,8).toUpperCase())}</b></div><div class="wallet-admin-meta" style="direction:ltr;text-align:right;overflow-wrap:anywhere">UID: ${walletAdminEscape(uid)}</div></div><div><strong>الرصيد: ${walletAdminMoney(Number.isFinite(Number(u.balanceEgp))?Number(u.balanceEgp):Number(u.balanceUsd||0)*(Number(document.getElementById('walletUsdToEgp').value)||50),'EGP')}</strong><div class="wallet-admin-meta">ما يعادله حاليًا ${walletAdminMoney((Number.isFinite(Number(u.balanceEgp))?Number(u.balanceEgp):Number(u.balanceUsd||0)*(Number(document.getElementById('walletUsdToEgp').value)||50))/(Number(document.getElementById('walletUsdToEgp').value)||50),'USD')}</div></div></div><div class="row" style="margin-top:10px"><div><label>المبلغ بالدولار</label><input type="number" min="0.01" step="0.01" id="walletAdjAmt_${uid}" placeholder="مثال: 5.00"></div><div><label>ملاحظة العملية</label><input id="walletAdjNote_${uid}" placeholder="سبب الإضافة أو الخصم"></div></div><div class="btn-group"><button class="btn-small btn-green" onclick="adjustWalletUser('${uid}',1)">إضافة رصيد</button><button class="btn-small btn-red" onclick="adjustWalletUser('${uid}',-1)">خصم رصيد</button></div></div>`).join('');}
         async function adjustWalletUser(uid,sign){if(!isAdminReady())return alert('يجب تسجيل الدخول أولاً.');const amount=Number(document.getElementById('walletAdjAmt_'+uid).value);const note=document.getElementById('walletAdjNote_'+uid).value.trim();const rate=Number(document.getElementById('walletUsdToEgp').value)||50;if(!Number.isFinite(amount)||amount<=0)return alert('أدخل مبلغًا صحيحًا أكبر من صفر.');const signedUsd=Math.round(amount*sign*10000)/10000;const signedEgp=Math.round(amount*rate*sign*100)/100;const user=walletUsersAdminCache[uid]||{};const currentEgp=Number.isFinite(Number(user.balanceEgp))?Number(user.balanceEgp):Number(user.balanceUsd||0)*rate;if(sign<0&&Math.abs(signedEgp)>currentEgp+0.001)return alert('الرصيد الحالي لا يكفي لهذا الخصم.');if(!confirm(`تأكيد ${sign>0?'إضافة':'خصم'} ${Math.abs(signedEgp).toFixed(2)} جنيه (ما يعادل ${amount.toFixed(2)} دولار بالسعر الحالي) ${sign>0?'إلى':'من'} رصيد ${user.email||uid}؟`))return;try{const ref=db.ref('wallet_users/'+uid);const tx=await ref.transaction(cur=>{cur=cur&&typeof cur==='object'?cur:{};const balEgp=Number.isFinite(Number(cur.balanceEgp))?Number(cur.balanceEgp):Number(cur.balanceUsd||0)*rate;if(!Number.isFinite(balEgp)||balEgp+signedEgp< -0.001)return;cur.balanceEgp=Math.round((balEgp+signedEgp)*100)/100;cur.balanceUsd=Math.round((cur.balanceEgp/rate)*10000)/10000;cur.updatedAt=Date.now();return cur;});if(!tx.committed)throw new Error('لم يتم تحديث الرصيد؛ قد يكون الرصيد تغير أو لا يكفي.');const logKey=db.ref('wallet_admin_adjustments').push().key;await db.ref('wallet_admin_adjustments/'+logKey).set({uid,email:user.email||'',amount:signedUsd,amountEgp:signedEgp,reason:note,admin:auth.currentUser.email||'',createdAt:firebase.database.ServerValue.TIMESTAMP});await refreshWalletUsers();alert('تم تحديث الرصيد بنجاح.');}catch(e){alert('تعذر تعديل الرصيد: '+dbErrorMessage(e));}}
 
+
+        let adminNotificationsEnabled = false;
+        let adminNotificationToastTimer = null;
+        function showAdminNotificationToast(title, body) {
+            const toast=document.getElementById('adminNotificationToast');
+            if(!toast)return;
+            toast.textContent=title+' — '+body;
+            toast.classList.add('show');
+            clearTimeout(adminNotificationToastTimer);
+            adminNotificationToastTimer=setTimeout(()=>toast.classList.remove('show'),6500);
+        }
+        function notifyAdminOfNewItem(title, body, tag) {
+            if(!isAdminReady())return;
+            showAdminNotificationToast(title,body);
+            if('Notification' in window && Notification.permission==='granted'){
+                try{
+                    const n=new Notification(title,{body,tag:'mohab-'+tag,icon:'https://g.top4top.io/p_39146kcfj0.png',renotify:false});
+                    n.onclick=()=>{window.focus();n.close();};
+                }catch(e){console.warn('Browser notification unavailable:',e);}
+            }
+        }
+        async function enableAdminBrowserNotifications(){
+            const status=document.getElementById('adminNotificationPermissionStatus');
+            const btn=document.getElementById('enableAdminNotificationsBtn');
+            if(!('Notification' in window)){status.textContent='هذا المتصفح لا يدعم إشعارات الويب.';return;}
+            if(!window.isSecureContext){status.textContent='يلزم فتح لوحة التحكم عبر HTTPS لتفعيل الإشعارات.';return;}
+            btn.disabled=true;
+            try{
+                const permission=await Notification.requestPermission();
+                if(permission==='granted'){
+                    adminNotificationsEnabled=true;
+                    status.textContent='تم السماح بالإشعارات. ستصلك تنبيهات الطلبات الجديدة أثناء تشغيل لوحة التحكم.';
+                    status.style.color='#047857';
+                    showAdminNotificationToast('تم تفعيل الإشعارات','سيتم تنبيهك عند وصول الطلبات الجديدة.');
+                }else{
+                    status.textContent=permission==='denied'?'تم رفض الإذن. غيّر سماح الإشعارات من إعدادات المتصفح.':'لم يتم منح الإذن بعد.';
+                    status.style.color='#b45309';
+                }
+            }catch(e){status.textContent='تعذر طلب إذن الإشعارات من المتصفح.';}
+            finally{btn.disabled=false;}
+        }
+        function watchAdminPathForNotifications(path,title,describe){
+            const ref=db.ref(path);
+            ref.once('value').then(initial=>{
+                if(!isAdminReady())return;
+                const known=new Set();
+                initial.forEach(child=>known.add(child.key));
+                const handler=snap=>{
+                    if(known.has(snap.key))return;
+                    known.add(snap.key);
+                    const body=describe(snap.val()||{});
+                    notifyAdminOfNewItem(title,body,path.replace(/[^\w-]/g,'-')+'-'+snap.key);
+                };
+                ref.on('child_added',handler);
+                activeDbListeners.push({ref,listener:handler,event:'child_added'});
+            }).catch(e=>console.warn('Notification listener failed:',path,e));
+        }
+        function watchAdminOrdersForNotifications(){
+            const ref=db.ref('wallet_orders');
+            ref.once('value').then(initial=>{
+                if(!isAdminReady())return;
+                const known=new Set();
+                initial.forEach(userNode=>userNode.forEach(order=>known.add(userNode.key+'/'+order.key)));
+                const handler=snap=>{
+                    const uid=snap.key;
+                    snap.forEach(order=>{
+                        const key=uid+'/'+order.key;
+                        if(known.has(key))return;
+                        known.add(key);
+                        const d=order.val()||{};
+                        notifyAdminOfNewItem('طلب شحن جديد',`${d.game||'منتج'} — ${d.pack||'باقة'} — ${d.price||''}`,'wallet-order-'+order.key);
+                    });
+                };
+                ref.on('child_added',handler);
+                activeDbListeners.push({ref,listener:handler,event:'child_added'});
+                // عند إضافة طلب داخل مستخدم موجود مسبقًا، يتغير فرع المستخدم وليس child_added على الجذر.
+                const valueHandler=snap=>{
+                    snap.forEach(userNode=>userNode.forEach(order=>{
+                        const key=userNode.key+'/'+order.key;
+                        if(known.has(key))return;
+                        known.add(key);
+                        const d=order.val()||{};
+                        notifyAdminOfNewItem('طلب شحن جديد',`${d.game||'منتج'} — ${d.pack||'باقة'} — ${d.price||''}`,'wallet-order-'+order.key);
+                    }));
+                };
+                ref.on('value',valueHandler);
+                activeDbListeners.push({ref,listener:valueHandler,event:'value'});
+            }).catch(e=>console.warn('Wallet order notifications failed:',e));
+        }
+
         function startDataListeners() {
             if (dataListenersStarted || !isAdminReady()) return;
             dataListenersStarted = true;
@@ -1988,6 +2114,9 @@
             });
 
             const gameRequestsRef = db.ref('gameRequests');
+            watchAdminPathForNotifications('gameRequests','طلب لعبة جديد',d=>`الزائر طلب إضافة: ${d.gameName||d.name||'لعبة جديدة'}`);
+            watchAdminPathForNotifications('wallet_deposits','طلب إيداع جديد',d=>`${d.displayName||d.email||'عميل'} — ${d.amount||''} ${d.currency||''}`);
+            watchAdminOrdersForNotifications();
             // value: تحميل كل السجلات الموجودة بالفعل.
             safeListener(gameRequestsRef, syncGameRequestsFromSnapshot);
             // child listeners: إضافة/تعديل/حذف كل طلب فورياً بدون استبدال الطلبات السابقة.
@@ -2080,6 +2209,14 @@
 
         document.getElementById('welcomePopupImageUrl').addEventListener('input', function() {
             if (this.value.trim()) updateWelcomePopupPreview(this.value.trim());
+        });
+        document.getElementById('visualWalletLoginGifFile').addEventListener('change', function(){
+            const file=this.files?.[0]; if(!file)return;
+            if(file.type!=='image/gif'){alert('اختر ملف GIF متحركًا.');this.value='';return;}
+            const url=URL.createObjectURL(file);document.getElementById('visualWalletLoginGifPreview').src=url;
+        });
+        document.getElementById('visualWalletLoginGifUrl').addEventListener('input', function(){
+            if(this.value.trim()) document.getElementById('visualWalletLoginGifPreview').src=this.value.trim();
         });
 
 
