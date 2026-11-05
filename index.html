@@ -487,6 +487,20 @@
         <!-- التبويب 2: المنتجات والألعاب -->
         <div id="tab-games" class="tab-content">
             <h2 id="gameSectionTitle">إدارة المنتجات <i class="fas fa-box-open" style="color:var(--primary);"></i></h2>
+            <div class="form-section" style="border-top:4px solid #0d9488;background:linear-gradient(135deg,#f0fdfa,#ffffff)">
+                <h3><i class="fas fa-dollar-sign" style="color:#0d9488"></i> تحويل أسعار الألعاب إلى الدولار تلقائياً</h3>
+                <p style="color:#64748b;line-height:1.8">استخدم سعر الصرف المحفوظ في إعدادات العملة. اختر ألعاباً محددة أو فعّل التطبيق على كل الألعاب. أي قائمة أسعار بالدولار تكتبها يدوياً داخل اللعبة ستظل لها الأولوية ولن يتم استبدالها.</p>
+                <div class="row" style="align-items:center">
+                    <div><label>سعر الدولار الحالي بالجنيه المصري</label><input type="number" id="gameUsdRate" min="0.01" step="0.01" placeholder="مثال: 50"></div>
+                    <div style="display:flex;align-items:center;min-height:52px"><label class="toggle-line"><input type="checkbox" id="usdPricingApplyAll" onchange="toggleUsdPricingGameChoices()"><span>تطبيق التحويل على جميع الألعاب</span></label></div>
+                </div>
+                <div id="usdPricingGameChoicesWrap" style="margin:10px 0;padding:14px;border:1px solid #dbeafe;border-radius:12px;background:#fff">
+                    <strong style="display:block;margin-bottom:10px">حدد الألعاب التي تريد تحويل أسعارها:</strong>
+                    <div id="usdPricingGameChoices" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:9px"><span style="color:#64748b">جاري تحميل الألعاب…</span></div>
+                </div>
+                <button class="action-btn" type="button" id="saveUsdPricingBtn" onclick="saveUsdPricingSettings()"><i class="fas fa-save"></i> حفظ وتطبيق إعدادات الدولار</button>
+                <div id="usdPricingStatus" style="margin-top:10px;color:#047857;font-size:.85rem" aria-live="polite"></div>
+            </div>
             <div class="form-section" style="border-top: 4px solid var(--primary);">
                 <div class="row">
                     <div style="flex:2;"><label>اسم العنصر:</label><input type="text" id="gName" placeholder="اسم اللعبة أو الموقع الخارجي"></div>
@@ -835,7 +849,51 @@
         // جميع التعديلات تتم على نفس المسارات القديمة حتى لا يتم حذف الإعدادات الأخرى.
         let globalGames = {};
         let editingGameId = null;
+        let usdPricingAdminSettings = { applyToAll:false, selectedGames:{} };
         let dataListenersStarted = false;
+        function renderUsdPricingGameChoices() {
+            const box=document.getElementById('usdPricingGameChoices'); if(!box)return;
+            const entries=Object.entries(globalGames||{}).filter(([,g])=>g && g.kind!=='external');
+            if(!entries.length){box.innerHTML='<span style="color:#64748b">لا توجد ألعاب/منتجات بقوائم أسعار حتى الآن.</span>';return;}
+            box.innerHTML=entries.map(([id,g])=>`<label class="toggle-line" style="padding:8px;border:1px solid #e2e8f0;border-radius:9px;background:#f8fafc"><input type="checkbox" class="usd-pricing-game-check" value="${escapeHtml(id)}" ${usdPricingAdminSettings.selectedGames&&usdPricingAdminSettings.selectedGames[id]===true?'checked':''}><span>${escapeHtml(g.name||'لعبة بدون اسم')}</span></label>`).join('');
+            toggleUsdPricingGameChoices();
+        }
+        function toggleUsdPricingGameChoices(){
+            const all=document.getElementById('usdPricingApplyAll');
+            const wrap=document.getElementById('usdPricingGameChoicesWrap');
+            if(wrap)wrap.style.opacity=all&&all.checked?'.55':'1';
+            document.querySelectorAll('.usd-pricing-game-check').forEach(el=>el.disabled=!!(all&&all.checked));
+        }
+        async function saveUsdPricingSettings(){
+            if(!isAdminReady())return alert('يجب تسجيل الدخول أولاً.');
+            const rate=Number(document.getElementById('gameUsdRate').value);
+            if(!Number.isFinite(rate)||rate<=0)return alert('أدخل سعر دولار صحيحاً أكبر من صفر.');
+            const applyToAll=!!document.getElementById('usdPricingApplyAll').checked;
+            const selectedGames={};
+            document.querySelectorAll('.usd-pricing-game-check:checked').forEach(el=>selectedGames[el.value]=true);
+            if(!applyToAll&&!Object.keys(selectedGames).length)return alert('اختر لعبة واحدة على الأقل أو فعّل التطبيق على جميع الألعاب.');
+            const btn=document.getElementById('saveUsdPricingBtn'),status=document.getElementById('usdPricingStatus');
+            btn.disabled=true;status.textContent='جاري حفظ سعر الصرف والألعاب المحددة…';
+            try{
+                // Preserve legacy EGP wallet balances before changing the shared exchange rate.
+                const oldSnap=await db.ref('wallet_settings/usdToEgp').once('value');
+                const oldRate=Number(oldSnap.val())>0?Number(oldSnap.val()):rate;
+                const usersSnap=await db.ref('wallet_users').once('value');
+                const users=usersSnap.val()||{},updates={};
+                Object.entries(users).forEach(([uid,u])=>{if(u&&typeof u==='object'&&!Number.isFinite(Number(u.balanceEgp)))updates['wallet_users/'+uid+'/balanceEgp']=Math.round(Number(u.balanceUsd||0)*oldRate*100)/100;});
+                if(Object.keys(updates).length)await db.ref().update(updates);
+                await db.ref('wallet_settings/usdToEgp').set(rate);
+                const settings={applyToAll,selectedGames,updatedAt:firebase.database.ServerValue.TIMESTAMP};
+                await db.ref('settings/usdPricing').set(settings);
+                const [rateCheck,settingsCheck]=await Promise.all([db.ref('wallet_settings/usdToEgp').once('value'),db.ref('settings/usdPricing').once('value')]);
+                if(Number(rateCheck.val())!==rate||!settingsCheck.exists())throw new Error('لم يتم التأكد من حفظ الإعدادات في قاعدة البيانات.');
+                usdPricingAdminSettings={applyToAll,selectedGames};
+                document.getElementById('walletUsdToEgp').value=rate;
+                status.textContent='تم الحفظ. ستُحوّل أسعار الألعاب المحددة تلقائياً عند عرض الدولار، مع الحفاظ على الأسعار اليدوية.';
+                alert('تم حفظ إعدادات تحويل أسعار الألعاب إلى الدولار بنجاح.');
+            }catch(e){status.textContent='تعذر الحفظ: '+dbErrorMessage(e);alert('تعذر حفظ إعدادات الدولار: '+dbErrorMessage(e));}
+            finally{btn.disabled=false;}
+        }
         const activeDbListeners = [];
 
         function openTab(tabId, btn) {
@@ -1183,6 +1241,7 @@
 
             document.getElementById('gamesList').innerHTML = html || '<div class="admin-card" style="justify-content:center;color:#94a3b8;">لا توجد منتجات مضافة.</div>';
             document.getElementById('discGameSelect').innerHTML = selectHtml || '<option value="">لا توجد منتجات</option>';
+            renderUsdPricingGameChoices();
         }
 
         async function deleteGame(id) {
@@ -1977,6 +2036,16 @@
 
         let adminNotificationsEnabled = false;
         let adminNotificationToastTimer = null;
+        let adminNotificationRegistration = null;
+        async function getAdminNotificationRegistration(){
+            if(!('serviceWorker' in navigator))return null;
+            if(adminNotificationRegistration)return adminNotificationRegistration;
+            try{
+                adminNotificationRegistration=await navigator.serviceWorker.register('./admin-notifications-sw.js');
+                await navigator.serviceWorker.ready;
+                return adminNotificationRegistration;
+            }catch(e){console.warn('Admin notification service worker registration failed:',e);return null;}
+        }
         function showAdminNotificationToast(title, body) {
             const toast=document.getElementById('adminNotificationToast');
             if(!toast)return;
@@ -1989,10 +2058,19 @@
             if(!isAdminReady())return;
             showAdminNotificationToast(title,body);
             if('Notification' in window && Notification.permission==='granted'){
-                try{
-                    const n=new Notification(title,{body,tag:'mohab-'+tag,icon:'https://g.top4top.io/p_39146kcfj0.png',renotify:false});
-                    n.onclick=()=>{window.focus();n.close();};
-                }catch(e){console.warn('Browser notification unavailable:',e);}
+                const options={body,tag:'mohab-'+tag,icon:'https://g.top4top.io/p_39146kcfj0.png',renotify:false,data:{url:location.href}};
+                if('serviceWorker' in navigator){
+                    getAdminNotificationRegistration().then(reg=>{
+                        const target=reg||navigator.serviceWorker;
+                        if(target&&typeof target.showNotification==='function')return target.showNotification(title,options);
+                        throw new Error('Service Worker showNotification unavailable');
+                    }).catch(e=>{
+                        console.warn('Service worker notification failed:',e);
+                        try{const n=new Notification(title,options);n.onclick=()=>{window.focus();n.close();};}catch(err){console.warn('Browser notification unavailable:',err);}
+                    });
+                }else{
+                    try{const n=new Notification(title,options);n.onclick=()=>{window.focus();n.close();};}catch(e){console.warn('Browser notification unavailable:',e);}
+                }
             }
         }
         async function enableAdminBrowserNotifications(){
@@ -2005,8 +2083,9 @@
                 const permission=await Notification.requestPermission();
                 if(permission==='granted'){
                     adminNotificationsEnabled=true;
-                    status.textContent='تم السماح بالإشعارات. ستصلك تنبيهات الطلبات الجديدة أثناء تشغيل لوحة التحكم.';
-                    status.style.color='#047857';
+                    const registration=await getAdminNotificationRegistration();
+                    status.textContent=registration?'تم السماح بالإشعارات وتجهيز خدمة التنبيهات. ستصلك التنبيهات أثناء تشغيل لوحة التحكم.':'تم السماح بالإشعارات، لكن تعذر تجهيز خدمة الإشعارات الخلفية. تأكد من رفع ملف admin-notifications-sw.js بجوار لوحة التحكم.';
+                    status.style.color=registration?'#047857':'#b45309';
                     showAdminNotificationToast('تم تفعيل الإشعارات','سيتم تنبيهك عند وصول الطلبات الجديدة.');
                 }else{
                     status.textContent=permission==='denied'?'تم رفض الإذن. غيّر سماح الإشعارات من إعدادات المتصفح.':'لم يتم منح الإذن بعد.';
@@ -2017,59 +2096,63 @@
         }
         function watchAdminPathForNotifications(path,title,describe){
             const ref=db.ref(path);
+            const buffered=[];let ready=false;const known=new Set();
+            const process=snap=>{
+                if(!snap||!snap.key||known.has(snap.key))return;
+                known.add(snap.key);
+                const data=snap.val()||{};
+                notifyAdminOfNewItem(title,describe(data),path.replace(/[^\w-]/g,'-')+'-'+snap.key);
+            };
+            const handler=snap=>{if(!ready)buffered.push(snap);else process(snap);};
+            ref.on('child_added',handler,error=>console.warn('Notification child listener failed:',path,error));
+            activeDbListeners.push({ref,listener:handler,event:'child_added'});
             ref.once('value').then(initial=>{
-                if(!isAdminReady())return;
-                const known=new Set();
                 initial.forEach(child=>known.add(child.key));
-                const handler=snap=>{
-                    if(known.has(snap.key))return;
-                    known.add(snap.key);
-                    const body=describe(snap.val()||{});
-                    notifyAdminOfNewItem(title,body,path.replace(/[^\w-]/g,'-')+'-'+snap.key);
-                };
-                ref.on('child_added',handler);
-                activeDbListeners.push({ref,listener:handler,event:'child_added'});
-            }).catch(e=>console.warn('Notification listener failed:',path,e));
+                ready=true;
+                buffered.forEach(snap=>{if(!known.has(snap.key))process(snap);});
+                buffered.length=0;
+            }).catch(e=>console.warn('Notification baseline failed:',path,e));
         }
         function watchAdminOrdersForNotifications(){
             const ref=db.ref('wallet_orders');
-            ref.once('value').then(initial=>{
-                if(!isAdminReady())return;
-                const known=new Set();
-                initial.forEach(userNode=>userNode.forEach(order=>known.add(userNode.key+'/'+order.key)));
-                const handler=snap=>{
-                    const uid=snap.key;
-                    snap.forEach(order=>{
-                        const key=uid+'/'+order.key;
-                        if(known.has(key))return;
-                        known.add(key);
-                        const d=order.val()||{};
-                        notifyAdminOfNewItem('طلب شحن جديد',`${d.game||'منتج'} — ${d.pack||'باقة'} — ${d.price||''}`,'wallet-order-'+order.key);
-                    });
-                };
-                ref.on('child_added',handler);
-                activeDbListeners.push({ref,listener:handler,event:'child_added'});
-                // عند إضافة طلب داخل مستخدم موجود مسبقًا، يتغير فرع المستخدم وليس child_added على الجذر.
-                const valueHandler=snap=>{
-                    snap.forEach(userNode=>userNode.forEach(order=>{
-                        const key=userNode.key+'/'+order.key;
-                        if(known.has(key))return;
-                        known.add(key);
-                        const d=order.val()||{};
-                        notifyAdminOfNewItem('طلب شحن جديد',`${d.game||'منتج'} — ${d.pack||'باقة'} — ${d.price||''}`,'wallet-order-'+order.key);
-                    }));
-                };
-                ref.on('value',valueHandler);
-                activeDbListeners.push({ref,listener:valueHandler,event:'value'});
-            }).catch(e=>console.warn('Wallet order notifications failed:',e));
+            let initialized=false;const known=new Set();
+            const handler=snap=>{
+                snap.forEach(userNode=>userNode.forEach(order=>{
+                    const key=userNode.key+'/'+order.key;
+                    if(known.has(key))return;
+                    known.add(key);
+                    if(!initialized)return;
+                    const d=order.val()||{};
+                    notifyAdminOfNewItem('طلب شحن جديد',`${d.game||d.gameName||'منتج'} — ${d.pack||d.package||'باقة'} — ${d.price||''}`,'wallet-order-'+order.key);
+                }));
+                initialized=true;
+            };
+            // value listener catches both new users and new orders under existing users.
+            ref.on('value',handler,error=>console.warn('Wallet order notification listener failed:',error));
+            activeDbListeners.push({ref,listener:handler,event:'value'});
         }
 
         function startDataListeners() {
             if (dataListenersStarted || !isAdminReady()) return;
             dataListenersStarted = true;
+            const permissionStatus=document.getElementById('adminNotificationPermissionStatus');
+            if('Notification' in window && permissionStatus){
+                permissionStatus.textContent=Notification.permission==='granted'?'الإشعارات مسموح بها على هذا المتصفح.':'اضغط تفعيل إشعارات المتصفح واسمح بها من نافذة المتصفح.';
+                if(Notification.permission==='granted')getAdminNotificationRegistration();
+                if(Notification.permission==='denied')permissionStatus.textContent='الإشعارات محظورة من إعدادات المتصفح. اسمح بها من إعدادات الموقع ثم أعد تحميل اللوحة.';
+            }
 
             safeListener(db.ref('wallet_settings/usdToEgp'), snap => {
-                if (snap.exists()) document.getElementById('walletUsdToEgp').value = Number(snap.val()) || '';
+                if (snap.exists()) {
+                    const rate=Number(snap.val())||'';
+                    document.getElementById('walletUsdToEgp').value=rate;
+                    document.getElementById('gameUsdRate').value=rate;
+                }
+            });
+            safeListener(db.ref('settings/usdPricing'), snap => {
+                usdPricingAdminSettings=snap.val()||{applyToAll:false,selectedGames:{}};
+                document.getElementById('usdPricingApplyAll').checked=usdPricingAdminSettings.applyToAll===true;
+                renderUsdPricingGameChoices();
             });
             safeListener(db.ref('wallet_settings/depositMethods'), snap => { if(!snap.exists()){const defaults={vodafone:{label:'فودافون كاش',target:'01019614169',kind:'phone',logo:'',enabled:true},etisalat:{label:'اتصالات كاش',target:'01125808758',kind:'phone',logo:'',enabled:true},binance:{label:'Binance Pay',target:'1231533425',kind:'id',logo:'',enabled:true}};db.ref('wallet_settings/depositMethods').set(defaults).catch(e=>console.warn('تعذر إنشاء طرق الإيداع الافتراضية',e));return;} walletMethodsAdminCache=snap.val()||{}; renderWalletMethodsAdmin(); });
             safeListener(db.ref('wallet_users'), snap => { walletUsersAdminCache=snap.val()||{}; renderWalletUsers(); });
