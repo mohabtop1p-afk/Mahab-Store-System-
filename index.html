@@ -872,7 +872,7 @@
             if(game.account_available || String(game.account_prices||'').trim()) options.push(['account','الشحن عن طريق الحساب']);
             (game.custom_methods||[]).forEach((m,i)=>{if(m && m.type!=='external')options.push(['custom_'+i,'طريقة: '+(m.name||('طريقة '+(i+1)))]);});
             if(!options.length){box.innerHTML='<span style="color:#b45309">اللعبة لا تحتوي على قوائم أسعار نصية. أضف قائمة أسعار أولاً ثم احفظ اللعبة.</span>';return;}
-            const saved=(usdPricingAdminSettings.listSelections||{})[id]||{};
+            const saved=game.usd_auto_lists||{};
             box.innerHTML=options.map(([key,label])=>`<label style="display:flex;align-items:center;gap:9px;padding:10px;border:1px solid #e2e8f0;border-radius:9px"><input type="checkbox" class="usd-target-list" value="${key}" ${saved[key]===true?'checked':''}><span>${escapeHtml(label)}</span></label>`).join('');
         }
         async function saveUsdListSelections(){
@@ -884,12 +884,11 @@
             const status=document.getElementById('usdListSelectionStatus');
             try{
                 status.textContent='جاري حفظ قوائم التحويل…';
-                await db.ref('settings/usdPricing/listSelections/'+id).set(selected);
-                const snap=await db.ref('settings/usdPricing/listSelections/'+id).once('value');
+                await db.ref('games/'+id+'/usd_auto_lists').set(selected);
+                const snap=await db.ref('games/'+id+'/usd_auto_lists').once('value');
                 if(JSON.stringify(snap.val()||{})!==JSON.stringify(selected))throw new Error('تعذر تأكيد حفظ الاختيارات');
-                usdPricingAdminSettings.listSelections=usdPricingAdminSettings.listSelections||{};
-                usdPricingAdminSettings.listSelections[id]=selected;
-                status.textContent='تم الحفظ والتحقق. القوائم المحددة فقط ستتحول للدولار.';
+                if(globalGames[id])globalGames[id].usd_auto_lists=selected;
+                status.textContent='تم الحفظ والتحقق داخل بيانات اللعبة. القوائم المحددة فقط ستتحول للدولار.';
             }catch(e){status.textContent='فشل الحفظ: '+dbErrorMessage(e);alert('تعذر حفظ الاختيارات: '+dbErrorMessage(e));}
         }
 
