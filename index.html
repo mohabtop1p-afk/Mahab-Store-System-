@@ -489,14 +489,9 @@
             <h2 id="gameSectionTitle">إدارة المنتجات <i class="fas fa-box-open" style="color:var(--primary);"></i></h2>
             <div class="form-section" style="border-top:4px solid #0d9488;background:linear-gradient(135deg,#f0fdfa,#ffffff)">
                 <h3><i class="fas fa-dollar-sign" style="color:#0d9488"></i> تحويل أسعار الألعاب إلى الدولار تلقائياً</h3>
-                <p style="color:#64748b;line-height:1.8">استخدم سعر الصرف المحفوظ في إعدادات العملة. اختر ألعاباً محددة أو فعّل التطبيق على كل الألعاب. أي قائمة أسعار بالدولار تكتبها يدوياً داخل اللعبة ستظل لها الأولوية ولن يتم استبدالها.</p>
+                <p style="color:#64748b;line-height:1.8">اكتب سعر الصرف هنا، ثم فعّل التحويل لكل قائمة على حدة من مفاتيح ID أو الحساب أو طرق الشحن المخصصة داخل بيانات اللعبة. القوائم التي لا تفعّلها تظل كما هي، وأي أسعار بالدولار تكتبها يدوياً لها الأولوية.</p>
                 <div class="row" style="align-items:center">
                     <div><label>سعر الدولار الحالي بالجنيه المصري</label><input type="number" id="gameUsdRate" min="0.01" step="0.01" placeholder="مثال: 50"></div>
-                    <div style="display:flex;align-items:center;min-height:52px"><label class="toggle-line"><input type="checkbox" id="usdPricingApplyAll" onchange="toggleUsdPricingGameChoices()"><span>تطبيق التحويل على جميع الألعاب</span></label></div>
-                </div>
-                <div id="usdPricingGameChoicesWrap" style="margin:10px 0;padding:14px;border:1px solid #dbeafe;border-radius:12px;background:#fff">
-                    <strong style="display:block;margin-bottom:10px">حدد الألعاب التي تريد تحويل أسعارها:</strong>
-                    <div id="usdPricingGameChoices" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:9px"><span style="color:#64748b">جاري تحميل الألعاب…</span></div>
                 </div>
                 <button class="action-btn" type="button" id="saveUsdPricingBtn" onclick="saveUsdPricingSettings()"><i class="fas fa-save"></i> حفظ وتطبيق إعدادات الدولار</button>
                 <div id="usdPricingStatus" style="margin-top:10px;color:#047857;font-size:.85rem" aria-live="polite"></div>
@@ -552,8 +547,8 @@
                 </div>
 
                 <div class="row price-inputs">
-                    <div><label>أسعار ID (بالمصري):</label><textarea id="gIdPrices" placeholder="مثال: 100 جوهرة = 50 ج"></textarea></div>
-                    <div><label>أسعار الحساب (بالمصري):</label><textarea id="gAccPrices"></textarea></div>
+                    <div><label>أسعار ID (بالمصري):</label><textarea id="gIdPrices" placeholder="مثال: 100 جوهرة = 50 ج"></textarea><label class="toggle-line" style="margin-top:8px"><input type="checkbox" id="gIdAutoUsd" checked><span>حوّل قائمة ID تلقائياً إلى الدولار</span></label></div>
+                    <div><label>أسعار الحساب (بالمصري):</label><textarea id="gAccPrices"></textarea><label class="toggle-line" style="margin-top:8px"><input type="checkbox" id="gAccAutoUsd" checked><span>حوّل قائمة الحساب تلقائياً إلى الدولار</span></label></div>
                 </div>
 
                 <div class="row">
@@ -868,30 +863,16 @@
             if(!isAdminReady())return alert('يجب تسجيل الدخول أولاً.');
             const rate=Number(document.getElementById('gameUsdRate').value);
             if(!Number.isFinite(rate)||rate<=0)return alert('أدخل سعر دولار صحيحاً أكبر من صفر.');
-            const applyToAll=!!document.getElementById('usdPricingApplyAll').checked;
-            const selectedGames={};
-            document.querySelectorAll('.usd-pricing-game-check:checked').forEach(el=>selectedGames[el.value]=true);
-            if(!applyToAll&&!Object.keys(selectedGames).length)return alert('اختر لعبة واحدة على الأقل أو فعّل التطبيق على جميع الألعاب.');
             const btn=document.getElementById('saveUsdPricingBtn'),status=document.getElementById('usdPricingStatus');
-            btn.disabled=true;status.textContent='جاري حفظ سعر الصرف والألعاب المحددة…';
+            btn.disabled=true;status.textContent='جاري حفظ سعر الصرف…';
             try{
-                // Preserve legacy EGP wallet balances before changing the shared exchange rate.
-                const oldSnap=await db.ref('wallet_settings/usdToEgp').once('value');
-                const oldRate=Number(oldSnap.val())>0?Number(oldSnap.val()):rate;
-                const usersSnap=await db.ref('wallet_users').once('value');
-                const users=usersSnap.val()||{},updates={};
-                Object.entries(users).forEach(([uid,u])=>{if(u&&typeof u==='object'&&!Number.isFinite(Number(u.balanceEgp)))updates['wallet_users/'+uid+'/balanceEgp']=Math.round(Number(u.balanceUsd||0)*oldRate*100)/100;});
-                if(Object.keys(updates).length)await db.ref().update(updates);
                 await db.ref('wallet_settings/usdToEgp').set(rate);
-                const settings={applyToAll,selectedGames,updatedAt:firebase.database.ServerValue.TIMESTAMP};
-                await db.ref('settings/usdPricing').set(settings);
-                const [rateCheck,settingsCheck]=await Promise.all([db.ref('wallet_settings/usdToEgp').once('value'),db.ref('settings/usdPricing').once('value')]);
-                if(Number(rateCheck.val())!==rate||!settingsCheck.exists())throw new Error('لم يتم التأكد من حفظ الإعدادات في قاعدة البيانات.');
-                usdPricingAdminSettings={applyToAll,selectedGames};
+                const check=await db.ref('wallet_settings/usdToEgp').once('value');
+                if(Number(check.val())!==rate)throw new Error('لم يتم التأكد من حفظ سعر الصرف.');
                 document.getElementById('walletUsdToEgp').value=rate;
-                status.textContent='تم الحفظ. ستُحوّل أسعار الألعاب المحددة تلقائياً عند عرض الدولار، مع الحفاظ على الأسعار اليدوية.';
-                alert('تم حفظ إعدادات تحويل أسعار الألعاب إلى الدولار بنجاح.');
-            }catch(e){status.textContent='تعذر الحفظ: '+dbErrorMessage(e);alert('تعذر حفظ إعدادات الدولار: '+dbErrorMessage(e));}
+                status.textContent='تم حفظ سعر الصرف. سيُحدّث الموقع الأسعار تلقائياً للقوائم التي فعّلت تحويلها داخل كل لعبة.';
+                alert('تم حفظ سعر الصرف بنجاح.');
+            }catch(e){status.textContent='تعذر الحفظ: '+dbErrorMessage(e);alert('تعذر حفظ سعر الدولار: '+dbErrorMessage(e));}
             finally{btn.disabled=false;}
         }
         const activeDbListeners = [];
@@ -1241,7 +1222,7 @@
 
             document.getElementById('gamesList').innerHTML = html || '<div class="admin-card" style="justify-content:center;color:#94a3b8;">لا توجد منتجات مضافة.</div>';
             document.getElementById('discGameSelect').innerHTML = selectHtml || '<option value="">لا توجد منتجات</option>';
-            renderUsdPricingGameChoices();
+
         }
 
         async function deleteGame(id) {
@@ -1251,7 +1232,7 @@
             catch (e) { alert('تعذر حذف المنتج: ' + dbErrorMessage(e)); }
         }
 
-        function addCustomMethodUI(name = '', prices = '', pricesUsd = '', methodType = 'prices', externalUrl = '') {
+        function addCustomMethodUI(name = '', prices = '', pricesUsd = '', methodType = 'prices', externalUrl = '', autoUsd = true) {
             const container = document.getElementById('customMethodsContainer');
             const div = document.createElement('div');
             div.className = 'custom-method-item';
@@ -1274,12 +1255,13 @@
                 </div>
                 <div class="cm-price-fields">
                     <div class="row">
-                        <div><label>الأسعار (بالمصري):</label><textarea class="cm-prices" placeholder="مثال: باقة فليكس = 50 ج">${safe(prices)}</textarea></div>
+                        <div><label>الأسعار (بالمصري):</label><textarea class="cm-prices" placeholder="مثال: باقة فليكس = 50 ج">${safe(prices)}</textarea><label class="toggle-line" style="margin-top:8px"><input type="checkbox" class="cm-auto-usd" checked><span>حوّل قائمة الأسعار دي تلقائياً للدولار</span></label></div>
                         <div><label>الأسعار (بالدولار):</label><textarea class="cm-prices-usd">${safe(pricesUsd)}</textarea></div>
                     </div>
                 </div>`;
             container.appendChild(div);
             div.querySelector('.cm-type').value = methodType === 'external' ? 'external' : 'prices';
+            const autoBox=div.querySelector('.cm-auto-usd'); if(autoBox)autoBox.checked=autoUsd!==false;
             toggleCustomMethodFields(div.querySelector('.cm-type'));
         }
 
@@ -1382,7 +1364,8 @@
                             external_url:methodType === 'external' ? methodUrl : '',
                             external_url_b64:methodType === 'external' ? btoa(unescape(encodeURIComponent(methodUrl))) : '',
                             prices:methodType === 'prices' ? (item.querySelector('.cm-prices')?.value || '') : '',
-                            prices_usd:methodType === 'prices' ? (item.querySelector('.cm-prices-usd')?.value || '') : ''
+                            prices_usd:methodType === 'prices' ? (item.querySelector('.cm-prices-usd')?.value || '') : '',
+                            auto_usd:methodType === 'prices' ? !!item.querySelector('.cm-auto-usd')?.checked : false
                         });
                     }
                 });
@@ -1461,11 +1444,13 @@
             document.getElementById('gAccPrices').value = g.account_prices || '';
             document.getElementById('gIdPricesUsd').value = g.id_prices_usd || '';
             document.getElementById('gAccPricesUsd').value = g.account_prices_usd || '';
+            document.getElementById('gIdAutoUsd').checked = g.id_auto_usd !== false;
+            document.getElementById('gAccAutoUsd').checked = g.account_auto_usd !== false;
             document.getElementById('gImgFile').value = '';
 
             document.getElementById('customMethodsContainer').innerHTML = '';
             if (Array.isArray(g.custom_methods)) {
-                g.custom_methods.forEach(cm => addCustomMethodUI(cm.name, cm.prices, cm.prices_usd, cm.type || 'prices', cm.external_url || decodeExternalMethodUrl(cm.external_url_b64)));
+                g.custom_methods.forEach(cm => addCustomMethodUI(cm.name, cm.prices, cm.prices_usd, cm.type || 'prices', cm.external_url || decodeExternalMethodUrl(cm.external_url_b64), cm.auto_usd !== false));
             }
             refreshPackageIconRows(g.package_icons || {});
 
@@ -1476,6 +1461,8 @@
 
         function cancelEdit() {
             editingGameId = null;
+            document.getElementById('gIdAutoUsd').checked = true;
+            document.getElementById('gAccAutoUsd').checked = true;
             document.getElementById('saveGameBtn').innerHTML = "<i class='fas fa-cloud-upload-alt'></i> حفظ المنتج في السيستم";
             document.getElementById('cancelEditBtn').style.display = 'none';
             ['gName','gImg','gIdPrices','gAccPrices','gIdPricesUsd','gAccPricesUsd','gImgFile','gExternalUrl','gExternalTitle','gPriceIcon','gPriceIconFile']
@@ -2148,11 +2135,6 @@
                     document.getElementById('walletUsdToEgp').value=rate;
                     document.getElementById('gameUsdRate').value=rate;
                 }
-            });
-            safeListener(db.ref('settings/usdPricing'), snap => {
-                usdPricingAdminSettings=snap.val()||{applyToAll:false,selectedGames:{}};
-                document.getElementById('usdPricingApplyAll').checked=usdPricingAdminSettings.applyToAll===true;
-                renderUsdPricingGameChoices();
             });
             safeListener(db.ref('wallet_settings/depositMethods'), snap => { if(!snap.exists()){const defaults={vodafone:{label:'فودافون كاش',target:'01019614169',kind:'phone',logo:'',enabled:true},etisalat:{label:'اتصالات كاش',target:'01125808758',kind:'phone',logo:'',enabled:true},binance:{label:'Binance Pay',target:'1231533425',kind:'id',logo:'',enabled:true}};db.ref('wallet_settings/depositMethods').set(defaults).catch(e=>console.warn('تعذر إنشاء طرق الإيداع الافتراضية',e));return;} walletMethodsAdminCache=snap.val()||{}; renderWalletMethodsAdmin(); });
             safeListener(db.ref('wallet_users'), snap => { walletUsersAdminCache=snap.val()||{}; renderWalletUsers(); });
