@@ -9,6 +9,7 @@
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-functions.js"></script>
     
     <style>
         :root { 
@@ -333,10 +334,57 @@
         <button class="tab-btn" onclick="openTab('tab-games', this)"><i class="fas fa-gamepad"></i> المنتجات</button>
         <button class="tab-btn" onclick="openTab('tab-requests', this)"><i class="fas fa-comments"></i> طلبات الألعاب</button>
         <button class="tab-btn" onclick="openTab('tab-discounts', this)" style="color:#f59e0b;"><i class="fas fa-bolt"></i> الخصومات</button>
+        <button class="tab-btn" onclick="openTab('tab-coins', this)" style="color:#d97706;"><i class="fas fa-coins"></i> نظام العملات</button>
         <button class="tab-btn" onclick="openTab('tab-wallet', this)" style="color:#0d9488;"><i class="fas fa-wallet"></i> المحفظة</button>
     </div>
 
     <div class="admin-container">
+
+<div id="tab-coins" class="tab-content">
+ <h2><i class="fas fa-coins" style="color:#d97706"></i> إدارة نظام العملات</h2>
+ <div class="form-section">
+  <h3>إعدادات عامة</h3>
+  <label>رابط صورة أيقونة العملة</label><input id="coinAdminIcon" type="url" placeholder="https://...">
+  <label>رابط صورة بطاقة الميزة في الصفحة الرئيسية</label><input id="coinAdminFeature" type="url" placeholder="https://...">
+  <label>رقم واتساب استقبال طلبات الاستبدال (بصيغة دولية بدون +)</label><input id="coinAdminWhatsapp" type="text" placeholder="201xxxxxxxxx">
+  <button class="action-btn" onclick="mohabAdminSaveCoinSettings()">حفظ الإعدادات</button>
+ </div>
+ <div class="form-section">
+  <h3>إضافة / تعديل مكافأة</h3>
+  <input id="coinGameId" placeholder="معرّف مختصر بالإنجليزية مثل weekly">
+  <input id="coinGameName" placeholder="اسم المكافأة">
+  <input id="coinGameCost" type="number" min="1" placeholder="تكلفة الاستبدال بالعملات">
+  <input id="coinGameImage" type="url" placeholder="رابط صورة المكافأة">
+  <label><input id="coinGameEnabled" type="checkbox" checked> المكافأة متاحة</label>
+  <button class="action-btn" onclick="mohabAdminSaveCoinGame()">حفظ المكافأة</button>
+  <button class="action-btn" style="background:#64748b" onclick="mohabAdminLoadCoinConfig()">تحديث القائمة</button>
+  <div id="coinAdminGamesList" style="margin-top:12px"></div>
+ </div>
+ <div class="form-section">
+  <h3>جدول مكافآت الشحن</h3>
+  <p>أدخل المبلغ المدفوع بالجنيه وعدد العملات المقابل. ابدأ بمكافآت قليلة حتى تراجع هامش الربح.</p>
+  <textarea id="coinRewardTiers" rows="7" placeholder='مثال: {"10":1,"20":3,"50":8}' style="width:100%;direction:ltr"></textarea>
+  <button class="action-btn" onclick="mohabAdminSaveCoinTiers()">حفظ جدول المكافآت</button>
+  <small style="display:block;color:#b45309;margin-top:8px">ملاحظة: تفعيل المكافآت التلقائية يتطلب ربط حدث شراء موثوق من الخادم؛ لا تعتمد على بيانات يرسلها المتصفح وحده.</small>
+ </div>
+
+ <div class="form-section">
+  <h3>إضافة عملات لحساب عميل بعد التحقق من الطلب</h3>
+  <input id="coinGrantUid" placeholder="Firebase UID الخاص بالعميل">
+  <input id="coinGrantAmount" type="number" min="1" step="1" placeholder="عدد العملات">
+  <input id="coinGrantReference" placeholder="رقم الطلب أو مرجع عملية الدفع">
+  <input id="coinGrantTitle" placeholder="وصف العملية (اختياري)" value="مكافأة شراء مؤكدة">
+  <button class="action-btn" onclick="mohabAdminGrantCoins()">إضافة العملات</button>
+  <small style="display:block;color:#b45309;margin-top:8px">لا تستخدم هذه الأداة إلا بعد التأكد من نجاح الدفع فعلياً. كل عملية تُسجل في سجل معاملات العميل.</small>
+ </div>
+ <div class="form-section">
+  <h3>مراجعة الأمان</h3>
+  <p>لا تعدّل قواعد Firebase الحالية بشكل شامل قبل دمج قواعد العملات معها؛ قد يؤدي استبدالها إلى تعطيل المحفظة والطلبات الحالية.</p>
+  <div id="coinAdminStatus" style="color:#64748b">يتم تحميل الإعدادات...</div>
+ </div>
+</div>
+
+
 
         <!-- التبويب 1: الإعدادات العامة -->
         <div id="tab-general" class="tab-content active">
@@ -2362,5 +2410,58 @@
         db.ref('wallet_discount_settings').on('value',snap=>renderWalletDiscountSettings(snap.val()));
 
     </script>
+
+<script id="mohabCoinsAdmin">
+(function(){
+ const $=id=>document.getElementById(id);
+ const FN_REGION='us-central1';
+ function call(name,data){return firebase.app().functions(FN_REGION).httpsCallable(name)(data);}
+ function esc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+ let cache={games:{},settings:{},rewardTiers:{}};
+ window.mohabAdminLoadCoinConfig=async function(){
+  try{
+   const s=await firebase.database().ref('coin_catalog').once('value');cache=s.val()||{games:{},settings:{},rewardTiers:{}};
+   $('coinAdminIcon').value=cache.settings?.coinImage||'';$('coinAdminFeature').value=cache.settings?.featureImage||'';
+   $('coinAdminWhatsapp').value=cache.settings?.whatsappNumber||'';
+   $('coinRewardTiers').value=JSON.stringify(cache.rewardTiers||{},null,2);
+   $('coinAdminGamesList').innerHTML=Object.entries(cache.games||{}).map(([id,g])=>`<div style="padding:10px;border:1px solid #ddd;border-radius:10px;margin:7px 0;display:flex;justify-content:space-between;gap:10px;align-items:center"><span><b>${esc(g.name)}</b> — ${Number(g.cost||0)} عملة <small>(${esc(id)})</small></span><button class="action-btn" style="background:#dc2626" onclick="mohabAdminDeleteCoinGame('${esc(id)}')">حذف</button></div>`).join('')||'لا توجد مكافآت بعد.';
+   $('coinAdminStatus').textContent='تم تحميل الإعدادات.';
+  }catch(e){$('coinAdminStatus').textContent='تعذر التحميل: '+e.message;}
+ };
+ window.mohabAdminSaveCoinSettings=async function(){
+  try{await call('saveCoinSettings',{settings:{coinImage:$('coinAdminIcon').value.trim(),featureImage:$('coinAdminFeature').value.trim(),whatsappNumber:$('coinAdminWhatsapp').value.trim()}});alert('تم حفظ الإعدادات.');mohabAdminLoadCoinConfig();}
+  catch(e){alert(e.message||'تعذر الحفظ.');}
+ };
+ window.mohabAdminSaveCoinGame=async function(){
+  const id=$('coinGameId').value.trim().replace(/[^a-zA-Z0-9_-]/g,'');
+  const name=$('coinGameName').value.trim(),cost=Number($('coinGameCost').value),image=$('coinGameImage').value.trim();
+  if(!id||!name||!Number.isInteger(cost)||cost<1){alert('أدخل المعرّف والاسم وتكلفة صحيحة.');return;}
+  try{await call('saveCoinGame',{gameId:id,game:{name,cost,image,enabled:$('coinGameEnabled').checked}});alert('تم حفظ المكافأة.');mohabAdminLoadCoinConfig();}
+  catch(e){alert(e.message||'تعذر الحفظ.');}
+ };
+ window.mohabAdminDeleteCoinGame=async function(id){
+  if(!confirm('هل تريد حذف هذه المكافأة؟'))return;
+  try{await call('deleteCoinGame',{gameId:id});mohabAdminLoadCoinConfig();}
+  catch(e){alert(e.message||'تعذر الحذف.');}
+ };
+
+ window.mohabAdminGrantCoins=async function(){
+  const uid=$('coinGrantUid').value.trim(),amount=Number($('coinGrantAmount').value),reference=$('coinGrantReference').value.trim(),title=$('coinGrantTitle').value.trim();
+  if(!uid||!Number.isSafeInteger(amount)||amount<1||!reference){alert('أدخل UID وعدد العملات ومرجع العملية.');return;}
+  if(!confirm(`إضافة ${amount} عملة للحساب؟ تأكدت من الدفع؟`))return;
+  try{const r=await call('adminGrantCoins',{uid,amount,reference,title});alert('تمت إضافة العملات. الرصيد الجديد: '+r.data.balance);$('coinGrantAmount').value='';}
+  catch(e){alert(e.message||'تعذر إضافة العملات.');}
+ };
+ window.mohabAdminSaveCoinTiers=async function(){
+  let tiers;try{tiers=JSON.parse($('coinRewardTiers').value||'{}');}catch(e){alert('صيغة JSON غير صحيحة.');return;}
+  try{await call('saveCoinRewardTiers',{rewardTiers:tiers});alert('تم حفظ جدول المكافآت.');mohabAdminLoadCoinConfig();}
+  catch(e){alert(e.message||'تعذر الحفظ.');}
+ };
+ const oldStart=window.startDataListeners;
+ // Load once when admin UI is opened/authenticated
+ firebase.auth().onAuthStateChanged(u=>{if(u&&(u.email||'').toLowerCase()==='mohabtop1p@gmail.com')mohabAdminLoadCoinConfig();});
+})();
+</script>
+
 </body>
 </html>
