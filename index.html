@@ -1987,7 +1987,7 @@
             const labels={pending_payment:'بانتظار الدفع',paid:'تم الدفع — بانتظار الشحن',processing:'قيد الشحن',shipped:'تم الشحن',rejected:'مرفوض',cancelled:'ملغي'};
             list.innerHTML=filtered.slice(0,250).map(o=>{const code=walletAdminEscape(o.code||o.key),uid=walletAdminEscape(o.uid||''),status=o.status||'unknown';
               return `<div class="admin-card wallet-admin-card"><div class="wallet-admin-card-top"><div><div class="wallet-admin-code">${code}</div><strong>${walletAdminEscape(o.game||'منتج')} — ${walletAdminEscape(o.pack||'باقة')}</strong><div class="wallet-admin-meta">${walletAdminEscape(o.email||'بدون بريد')} · ${walletAdminEscape(o.price||'')}</div></div><span class="wallet-admin-status ${status==='shipped'?'wallet-status-approved':status==='rejected'?'wallet-status-rejected':'wallet-status-pending'}">${labels[status]||walletAdminEscape(status)}</span></div>
-              <div class="wallet-admin-meta" style="margin-top:10px"><div><strong>طريقة الطلب:</strong> ${walletAdminEscape(o.paymentType==='whatsapp'?'واتساب غير مدفوع':'محفظة')} | <strong>طريقة الشحن:</strong> ${walletAdminEscape(o.method||'غير محدد')}</div><div><strong>UID:</strong> <span style="direction:ltr;display:inline-block;word-break:break-all">${uid}</span> | <strong>التاريخ:</strong> ${walletAdminEscape(walletAdminDate(o.createdAt))}</div></div>
+              <div class="wallet-admin-meta" style="margin-top:10px"><div><strong>طريقة الطلب:</strong> ${walletAdminEscape(o.paymentType==='whatsapp'?'واتساب غير مدفوع':'محفظة')} | <strong>طريقة الشحن:</strong> ${walletAdminEscape(o.method||'غير محدد')}</div><div><strong>UID:</strong> <span style="direction:ltr;display:inline-block;word-break:break-all">${uid}</span> | <strong>التاريخ:</strong> ${walletAdminEscape(walletAdminDate(o.createdAt))}</div>${o.deliveryDetails?`<div><strong>تفاصيل التسليم:</strong> ${walletAdminEscape(o.deliveryDetails)}</div>`:''}${o.rejectionReason?`<div style="color:#dc2626"><strong>سبب الرفض:</strong> ${walletAdminEscape(o.rejectionReason)}</div>`:''}<div><strong>آخر تحديث:</strong> ${walletAdminEscape(walletAdminDate(o.updatedAt))}</div></div>
               <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px"><button class="btn-small" onclick="setWalletOrderStatus('${walletAdminEscape(o.uid)}','${walletAdminEscape(o.key)}','processing')">قيد الشحن</button><button class="btn-small" style="background:#059669" onclick="setWalletOrderStatus('${walletAdminEscape(o.uid)}','${walletAdminEscape(o.key)}','shipped')">تم الشحن</button><button class="btn-small" style="background:#dc2626" onclick="setWalletOrderStatus('${walletAdminEscape(o.uid)}','${walletAdminEscape(o.key)}','rejected')">رفض</button><button class="btn-small" style="background:#64748b" onclick="setWalletOrderStatus('${walletAdminEscape(o.uid)}','${walletAdminEscape(o.key)}','pending_payment')">بانتظار الدفع</button></div></div>`;
             }).join('');
         }
@@ -1995,18 +1995,18 @@
             if(!isAdminReady())return alert('يجب تسجيل الدخول بحساب الإدارة.');
             const names={processing:'قيد الشحن',shipped:'تم الشحن',rejected:'مرفوض',pending_payment:'بانتظار الدفع'};
             if(!confirm(`تأكيد تغيير حالة الطلب إلى «${names[status]||status}»؟`))return;
-            let deliveryDetails;
-            if(status==='shipped'){
-                deliveryDetails=prompt('اكتب تفاصيل الشحنة أو رقم العملية/التسليم (اختياري):','');
-                if(deliveryDetails===null)return;
-            }
+            let details='';
+            if(status==='shipped'){details=prompt('اكتب تفاصيل الشحنة أو كود التسليم الذي سيظهر للعميل:','')||'';}
+            if(status==='rejected'){details=prompt('اكتب سبب رفض الطلب ليظهر للعميل:','')||'';}
             try{
                 const ref=db.ref(`wallet_orders/${uid}/${key}`);
                 const update={status,updatedAt:firebase.database.ServerValue.TIMESTAMP,updatedBy:auth.currentUser.email||''};
-                if(status==='shipped'){update.shippedAt=firebase.database.ServerValue.TIMESTAMP;if(deliveryDetails.trim())update.deliveryDetails=deliveryDetails.trim();}
-                update['statusHistory/'+Date.now()]={status,admin:auth.currentUser.email||'',at:firebase.database.ServerValue.TIMESTAMP,details:deliveryDetails||''};
+                if(status==='shipped'){update.shippedAt=firebase.database.ServerValue.TIMESTAMP;update.deliveryDetails=details.trim();}
+                if(status==='rejected')update.rejectionReason=details.trim();
+                const eventKey=ref.child('statusHistory').push().key;
+                update[`statusHistory/${eventKey}`]={status,admin:auth.currentUser.email||'',at:firebase.database.ServerValue.TIMESTAMP,details:details.trim()};
                 await ref.update(update);
-                alert('تم تحديث حالة الطلب وتسجيل التحديث. سيظهر للعميل في سجل طلباته.');
+                alert('تم تحديث حالة الطلب وحفظ تفاصيل القرار، وستظهر للعميل في قسم طلباتي.');
             }catch(e){alert('تعذر تحديث حالة الطلب: '+dbErrorMessage(e));}
         }
         async function refreshWalletDeposits() {
@@ -2223,6 +2223,7 @@
             });
             safeListener(db.ref('wallet_orders'), renderWalletOrders);
 
+            safeListener(db.ref('settings/announcementTicker'), snap => renderAnnouncementTickerSettings(snap.val()||{}));
             safeListener(db.ref('settings/visuals'), snap => { loadVisualSettingsIntoForm(snap.val() || {}); });
             safeListener(db.ref('settings/currencyFlags'), snap => { loadCurrencyFlagsForm(snap.val() || {}); });
 
@@ -2374,6 +2375,30 @@
             const expiryInput=document.getElementById('walletDiscountExpiryHours');if(expiryInput)expiryInput.value=Math.max(1,Math.min(8760,Number(settings.expiryHours)||24));
             box.innerHTML=Object.keys(walletDiscountDefaults).map(p=>{const o=options[p]||walletDiscountDefaults[p];return `<div style="flex:1;min-width:125px;background:#fff;border:1px solid #d1fae5;border-radius:14px;padding:12px"><label class="toggle-line"><input type="checkbox" id="wdEnabled${p}" ${o.enabled!==false?'checked':''}><span>خصم ${p}%</span></label><label style="margin-top:12px">وزن الظهور</label><input type="number" id="wdWeight${p}" min="0" max="10000" step="1" value="${Math.max(0,Number(o.weight)||0)}"><small style="display:block;color:#64748b;line-height:1.6;margin-top:6px">0 = فرصة معدومة</small></div>`}).join('');
         }
+
+        function renderAnnouncementTickerSettings(data){
+            data=data||{};
+            const messages=Array.isArray(data.messages)?data.messages:(typeof data.text==='string'?data.text.split(/\r?\n/):[]);
+            const set=(id,value)=>{const el=document.getElementById(id);if(el&&document.activeElement!==el)el.value=value;};
+            set('announcementTickerMessages',messages.join('\n'));
+            set('announcementTickerBg',/^#[0-9a-f]{6}$/i.test(data.background||'')?data.background:'#082f49');
+            set('announcementTickerColor',/^#[0-9a-f]{6}$/i.test(data.color||'')?data.color:'#ecfeff');
+            set('announcementTickerSpeed',Math.max(4,Math.min(30,Number(data.speed)||12)));
+            const enabled=document.getElementById('announcementTickerEnabled');if(enabled&&document.activeElement!==enabled)enabled.checked=data.enabled!==false;
+        }
+        async function saveAnnouncementTicker(){
+            if(!isAdminReady())return alert('يجب تسجيل الدخول بحساب الإدارة.');
+            const messages=(document.getElementById('announcementTickerMessages').value||'').split(/\r?\n/).map(x=>x.trim()).filter(Boolean).slice(0,5);
+            const value={messages,background:document.getElementById('announcementTickerBg').value,color:document.getElementById('announcementTickerColor').value,speed:Math.max(4,Math.min(30,Number(document.getElementById('announcementTickerSpeed').value)||12)),enabled:document.getElementById('announcementTickerEnabled').checked,updatedAt:firebase.database.ServerValue.TIMESTAMP};
+            const msg=document.getElementById('announcementTickerMsg');
+            try{await db.ref('settings/announcementTicker').set(value);msg.textContent='تم حفظ شريط الأخبار بنجاح.';msg.style.color='#047857';}
+            catch(e){msg.textContent='تعذر الحفظ: '+dbErrorMessage(e);msg.style.color='#dc2626';}
+        }
+        function previewAnnouncementTicker(){
+            const messages=(document.getElementById('announcementTickerMessages').value||'').split(/\r?\n/).map(x=>x.trim()).filter(Boolean);
+            alert(messages.length?'معاينة الأخبار:\n\n'+messages.join('\n\n'):'اكتب خبراً واحداً على الأقل للمعاينة.');
+        }
+
         async function saveWalletDiscountSettings(){
             if(!isAdminReady())return alert('يجب تسجيل الدخول أولاً.');
             const msg=document.getElementById('walletDiscountSettingsMsg');
