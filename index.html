@@ -358,7 +358,7 @@
             
             <div class="form-section" style="border-top:4px solid #0ea5e9">
                 <h3><i class="fas fa-bell" style="color:#0ea5e9"></i> إشعارات الطلبات على هذا الجهاز</h3>
-                <p class="notification-settings-note">فعّل الإشعارات للسماح للمتصفح بعرض تنبيه عند وصول طلب لعبة أو إيداع أو طلب شحن جديد. يجب السماح بالإشعارات من إعدادات المتصفح، وأن تكون لوحة التحكم مفتوحة لاستقبال تنبيهات Firebase المباشرة.</p>
+                <p class="notification-settings-note">فعّل الإشعارات للسماح للمتصفح بعرض تنبيه عند وصول طلب لعبة أو إيداع أو طلب شحن جديد. يجب فتح لوحة التحكم عبر HTTPS في Chrome أو Edge. لإرسال إشعارات حتى بعد إغلاق المتصفح يلزم إعداد VAPID ورفع Service Worker ونشر Cloud Function المرفقة.</p>
                 <button class="action-btn" type="button" id="enableAdminNotificationsBtn" onclick="enableAdminBrowserNotifications()"><i class="fas fa-bell"></i> تفعيل إشعارات المتصفح</button>
                 <div id="adminNotificationPermissionStatus" style="margin-top:10px;font-size:.84rem;color:#64748b" aria-live="polite">لم يتم طلب الإذن بعد.</div>
                 <div class="notification-settings-note" style="margin-top:14px">
@@ -370,6 +370,25 @@
                     </div>
                     <small>يتم حفظ الاختيارات لحساب الإدارة. التنبيه بعد إغلاق المتصفح يحتاج إعداد FCM والخادم الموضح في ملف التعليمات.</small>
                 </div>
+            </div>
+
+
+            <div class="form-section" style="border-top:4px solid #8b5cf6">
+                <h3><i class="fas fa-bullhorn" style="color:#8b5cf6"></i> شريط آخر الأخبار أسفل الشريط العلوي</h3>
+                <p style="color:#64748b;line-height:1.8">اكتب الأخبار التي تريد عرضها في الموقع الرئيسي. كل خبر في سطر مستقل، ويمكنك التحكم في اللون وسرعة الحركة.</p>
+                <label for="announcementTickerMessages">نصوص الأخبار (حتى 5 أخبار، كل خبر في سطر)</label>
+                <textarea id="announcementTickerMessages" rows="4" maxlength="1200" placeholder="🔥 عروض اليوم بدأت الآن&#10;🎮 تمت إضافة لعبة جديدة&#10;📦 تابع حالة طلبك من قسم طلباتي" style="width:100%;padding:12px;border:1px solid #cbd5e1;border-radius:12px;font:inherit;box-sizing:border-box"></textarea>
+                <div class="row" style="gap:12px;align-items:end;flex-wrap:wrap;margin-top:12px">
+                    <div style="flex:1;min-width:120px"><label>لون خلفية الشريط</label><input type="color" id="announcementTickerBg" value="#082f49" style="height:44px;padding:4px"></div>
+                    <div style="flex:1;min-width:120px"><label>لون الكتابة</label><input type="color" id="announcementTickerColor" value="#ecfeff" style="height:44px;padding:4px"></div>
+                    <div style="flex:1;min-width:120px"><label>مدة الدورة (ثوانٍ)</label><input type="number" id="announcementTickerSpeed" min="4" max="30" value="12"></div>
+                </div>
+                <label class="toggle-line" style="margin-top:12px"><input type="checkbox" id="announcementTickerEnabled" checked><span>إظهار شريط الأخبار في الموقع الرئيسي</span></label>
+                <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px">
+                    <button type="button" class="action-btn" onclick="saveAnnouncementTicker()"><i class="fas fa-save"></i> حفظ ونشر الأخبار</button>
+                    <button type="button" class="btn-small" onclick="previewAnnouncementTicker()">معاينة النصوص</button>
+                </div>
+                <div id="announcementTickerMsg" role="status" style="margin-top:9px;font-size:.84rem"></div>
             </div>
 
             <div class="form-section">
@@ -2113,8 +2132,9 @@
             }catch(e){console.warn('Could not load notification preferences',e);}
         }
         async function registerAdminFcmToken(){
-            if(!('serviceWorker' in navigator) || !firebase.messaging)throw new Error('المتصفح لا يدعم Firebase Messaging.');
-            if(MOHAB_FCM_VAPID_KEY.startsWith('PUT_'))throw new Error('أضف VAPID public key في متغير MOHAB_FCM_VAPID_KEY داخل لوحة التحكم أولاً.');
+            if(!('serviceWorker' in navigator))throw new Error('المتصفح الحالي لا يدعم Service Worker. افتح لوحة التحكم من Chrome أو Edge عبر HTTPS وليس من متصفح داخل تطبيق.');
+            if(!firebase.messaging)throw new Error('ملف Firebase Messaging غير محمّل. تأكد من وجود firebase-messaging-compat.js بعد firebase-app-compat.js.');
+            if(MOHAB_FCM_VAPID_KEY.startsWith('PUT_'))throw new Error('لم يتم إدخال مفتاح Web Push (VAPID) بعد. من Firebase Console افتح Project settings ثم Cloud Messaging وأنشئ Web Push certificate وانسخ المفتاح العام إلى MOHAB_FCM_VAPID_KEY.');
             const registration=await getAdminNotificationRegistration();
             if(!registration)throw new Error('تعذر تسجيل Service Worker. تأكد من رفع admin-notifications-sw.js في جذر الموقع عبر HTTPS.');
             adminMessaging=firebase.messaging();
@@ -2142,15 +2162,19 @@
                 const permission=await Notification.requestPermission();
                 if(permission==='granted'){
                     adminNotificationsEnabled=true;
-                    const registration=await getAdminNotificationRegistration();
-                    let fcmMessage='';
-                    if(registration && isAdminReady()){
-                        try{await registerAdminFcmToken();fcmMessage=' وتم تسجيل هذا الجهاز للإشعارات حتى بعد إغلاق المتصفح.';}
-                        catch(fcmError){fcmMessage=' لكن إشعارات الخلفية لم تكتمل: '+fcmError.message;}
+                    let registration=null,fcmMessage='';
+                    try{
+                        registration=await getAdminNotificationRegistration();
+                        if(!registration)throw new Error('تعذر تسجيل Service Worker. ارفع admin-notifications-sw.js في جذر الموقع وافتح الموقع عبر HTTPS.');
+                        await registerAdminFcmToken();
+                        fcmMessage=' تم تسجيل الجهاز لاستقبال إشعارات الخلفية.';
+                        status.style.color='#047857';
+                    }catch(fcmError){
+                        fcmMessage=' الإشعارات داخل لوحة التحكم تعمل عند فتحها، لكن إشعارات الخلفية لم تكتمل: '+fcmError.message;
+                        status.style.color='#b45309';
                     }
-                    status.textContent=registration?'تم السماح بالإشعارات وتجهيز خدمة التنبيهات.'+fcmMessage:'تم السماح بالإشعارات، لكن تعذر تجهيز خدمة الإشعارات الخلفية. تأكد من رفع ملف admin-notifications-sw.js بجوار لوحة التحكم.';
-                    status.style.color=registration?'#047857':'#b45309';
-                    showAdminNotificationToast('تم تفعيل الإشعارات','سيتم تنبيهك عند وصول الطلبات الجديدة.');
+                    status.textContent='تم السماح بإذن الإشعارات.'+fcmMessage;
+                    showAdminNotificationToast('تم تفعيل الإشعارات','تم منح الإذن.');
                 }else{
                     status.textContent=permission==='denied'?'تم رفض الإذن. غيّر سماح الإشعارات من إعدادات المتصفح.':'لم يتم منح الإذن بعد.';
                     status.style.color='#b45309';
