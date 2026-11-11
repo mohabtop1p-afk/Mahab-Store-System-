@@ -381,7 +381,7 @@
                 <div class="row" style="gap:12px;align-items:end;flex-wrap:wrap;margin-top:12px">
                     <div style="flex:1;min-width:120px"><label>لون خلفية الشريط</label><input type="color" id="announcementTickerBg" value="#082f49" style="height:44px;padding:4px"></div>
                     <div style="flex:1;min-width:120px"><label>لون الكتابة</label><input type="color" id="announcementTickerColor" value="#ecfeff" style="height:44px;padding:4px"></div>
-                    <div style="flex:1;min-width:120px"><label>مدة الدورة (ثوانٍ)</label><input type="number" id="announcementTickerSpeed" min="4" max="30" value="12"></div>
+                    <div style="flex:1;min-width:150px"><label for="announcementTickerSpeedMode">سرعة مرور الأخبار</label><select id="announcementTickerSpeedMode" style="height:44px"><option value="slow">بطيء</option><option value="normal" selected>متوسط</option><option value="fast">سريع</option></select></div>
                 </div>
                 <label class="toggle-line" style="margin-top:12px"><input type="checkbox" id="announcementTickerEnabled" checked><span>إظهار شريط الأخبار في الموقع الرئيسي</span></label>
                 <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px">
@@ -2456,15 +2456,17 @@
             set('announcementTickerMessages',messages.join('\n'));
             set('announcementTickerBg',/^#[0-9a-f]{6}$/i.test(data.background||'')?data.background:'#082f49');
             set('announcementTickerColor',/^#[0-9a-f]{6}$/i.test(data.color||'')?data.color:'#ecfeff');
-            set('announcementTickerSpeed',Math.max(4,Math.min(30,Number(data.speed)||12)));
+            const legacyDuration=Math.max(4,Math.min(30,Number(data.speed)||12));
+            const legacyMode=legacyDuration>=20?'slow':(legacyDuration<=8?'fast':'normal');
+            set('announcementTickerSpeedMode',['slow','normal','fast'].includes(data.speedMode)?data.speedMode:legacyMode);
             const enabled=document.getElementById('announcementTickerEnabled');if(enabled&&document.activeElement!==enabled)enabled.checked=data.enabled!==false;
         }
         async function saveAnnouncementTicker(){
             if(!isAdminReady())return alert('يجب تسجيل الدخول بحساب الإدارة.');
             const messages=(document.getElementById('announcementTickerMessages').value||'').split(/\r?\n/).map(x=>x.trim()).filter(Boolean).slice(0,5);
-            const value={messages,background:document.getElementById('announcementTickerBg').value,color:document.getElementById('announcementTickerColor').value,speed:Math.max(4,Math.min(30,Number(document.getElementById('announcementTickerSpeed').value)||12)),enabled:document.getElementById('announcementTickerEnabled').checked,updatedAt:firebase.database.ServerValue.TIMESTAMP};
+            const value={messages,background:document.getElementById('announcementTickerBg').value,color:document.getElementById('announcementTickerColor').value,speedMode:document.getElementById('announcementTickerSpeedMode').value,enabled:document.getElementById('announcementTickerEnabled').checked,updatedAt:firebase.database.ServerValue.TIMESTAMP};
             const msg=document.getElementById('announcementTickerMsg');
-            try{await db.ref('settings/announcementTicker').set(value);msg.textContent='تم حفظ شريط الأخبار بنجاح.';msg.style.color='#047857';}
+            try{await db.ref('settings/announcementTicker').update(value);msg.textContent='تم حفظ شريط الأخبار بنجاح.';msg.style.color='#047857';}
             catch(e){msg.textContent='تعذر الحفظ: '+dbErrorMessage(e);msg.style.color='#dc2626';}
         }
         function previewAnnouncementTicker(){
