@@ -374,8 +374,8 @@
 
 
             <div class="form-section" style="border-top:4px solid #8b5cf6">
-                <h3><i class="fas fa-bullhorn" style="color:#8b5cf6"></i> شريط آخر الأخبار أسفل الشريط العلوي</h3>
-                <p style="color:#64748b;line-height:1.8">اكتب الأخبار التي تريد عرضها في الموقع الرئيسي. كل خبر في سطر مستقل، ويمكنك التحكم في اللون وسرعة الحركة.</p>
+                <h3><i class="fas fa-bullhorn" style="color:#8b5cf6"></i> شريط آخر الأحداث</h3>
+                <p style="color:#64748b;line-height:1.8">يظهر كشريط أفقي بسيط أسفل الشريط العلوي، بدون عنوان أو صندوق إضافي. كل خبر في سطر مستقل، ويمكنك التحكم في اللون وسرعة الحركة.</p>
                 <label for="announcementTickerMessages">نصوص الأخبار (حتى 5 أخبار، كل خبر في سطر)</label>
                 <textarea id="announcementTickerMessages" rows="4" maxlength="1200" placeholder="🔥 عروض اليوم بدأت الآن&#10;🎮 تمت إضافة لعبة جديدة&#10;📦 تابع حالة طلبك من قسم طلباتي" style="width:100%;padding:12px;border:1px solid #cbd5e1;border-radius:12px;font:inherit;box-sizing:border-box"></textarea>
                 <div class="row" style="gap:12px;align-items:end;flex-wrap:wrap;margin-top:12px">
@@ -525,11 +525,22 @@
                 <button class="action-btn" type="button" id="saveUsdPricingBtn" onclick="saveUsdPricingSettings()"><i class="fas fa-save"></i> حفظ وتطبيق إعدادات الدولار</button>
                 <div id="usdPricingStatus" style="margin-top:10px;color:#047857;font-size:.85rem" aria-live="polite"></div>
             </div>
+            <div class="form-section" style="border-top:4px solid #8b5cf6">
+                <h3><i class="fas fa-layer-group" style="color:#8b5cf6"></i> إدارة تصنيفات المنتجات</h3>
+                <p style="color:#64748b;line-height:1.8">أضف التصنيفات التي تريد ظهورها أسفل البحث في الموقع الرئيسي، ثم اختر تصنيف كل منتج بشكل يدوي عند إضافته أو تعديله.</p>
+                <div class="row" style="align-items:end">
+                    <div><label for="newProductCategoryName">اسم التصنيف</label><input type="text" id="newProductCategoryName" maxlength="50" placeholder="مثال: الألعاب الترفيهية"></div>
+                    <div style="flex:0 0 180px"><button type="button" class="action-btn" onclick="addProductCategory()"><i class="fas fa-plus"></i> إضافة التصنيف</button></div>
+                </div>
+                <div id="productCategoriesAdminList" style="margin-top:12px"></div>
+                <div id="productCategoriesAdminMsg" role="status" style="margin-top:8px;font-size:.84rem"></div>
+            </div>
             <div class="form-section" style="border-top: 4px solid var(--primary);">
                 <div class="row">
                     <div style="flex:2;"><label>اسم العنصر:</label><input type="text" id="gName" placeholder="اسم اللعبة أو الموقع الخارجي"></div>
                     <div><label>نوع العنصر:</label><select id="gKind" onchange="toggleExternalFields()"><option value="prices">قائمة أسعار / شحن</option><option value="external">رابط موقع خارجي</option></select></div>
                     <div><label>الترتيب:</label><input type="number" id="gOrder" value="1"></div>
+                    <div><label for="gCategory">تصنيف المنتج:</label><select id="gCategory"><option value="">بدون تصنيف</option></select></div>
                 </div>
                 
                 <label style="margin-top: 15px;">صورة المنتج (اختر من المعرض أو ضع رابط):</label>
@@ -872,6 +883,7 @@
         // ملاحظة مهمة: لا يتم استخدام set() على أي مسار أب أعلى من العنصر المراد تعديله.
         // جميع التعديلات تتم على نفس المسارات القديمة حتى لا يتم حذف الإعدادات الأخرى.
         let globalGames = {};
+        let globalProductCategories = {};
         let editingGameId = null;
         let usdPricingAdminSettings = { applyToAll:false, selectedGames:{} };
         let dataListenersStarted = false;
@@ -1226,6 +1238,39 @@
             }
         }
 
+        function renderProductCategoriesAdmin(snap) {
+            globalProductCategories = snap && snap.exists() ? (snap.val() || {}) : {};
+            const select = document.getElementById('gCategory');
+            const current = select ? select.value : '';
+            const entries = Object.keys(globalProductCategories).map(key => ({key, ...(globalProductCategories[key] || {})})).filter(c => c.name).sort((a,b)=>(Number(a.order)||99)-(Number(b.order)||99));
+            if (select) {
+                select.innerHTML = '<option value="">بدون تصنيف</option>' + entries.map(c => `<option value="${escapeHtml(c.key)}">${escapeHtml(c.name)}</option>`).join('');
+                if (entries.some(c => c.key===current)) select.value=current;
+            }
+            const list = document.getElementById('productCategoriesAdminList');
+            if (list) list.innerHTML = entries.length ? entries.map(c => `<div class="admin-card" style="padding:12px 15px"><strong>${escapeHtml(c.name)}</strong><button class="btn-small btn-red" type="button" onclick="deleteProductCategory('${c.key}')"><i class="fas fa-trash"></i> حذف</button></div>`).join('') : '<div class="request-empty">لا توجد تصنيفات مضافة حتى الآن.</div>';
+        }
+        async function addProductCategory() {
+            if (!isAdminReady()) return alert('يجب تسجيل الدخول أولاً.');
+            const input=document.getElementById('newProductCategoryName');
+            const name=(input.value||'').trim();
+            if(!name)return alert('اكتب اسم التصنيف أولاً.');
+            const duplicate=Object.values(globalProductCategories||{}).some(c=>String(c?.name||'').trim().toLowerCase()===name.toLowerCase());
+            if(duplicate)return alert('هذا التصنيف موجود بالفعل.');
+            try {
+                const ref=db.ref('settings/productCategories').push();
+                await ref.set({name,order:Object.keys(globalProductCategories||{}).length+1,createdAt:firebase.database.ServerValue.TIMESTAMP});
+                input.value='';
+                const msg=document.getElementById('productCategoriesAdminMsg');msg.textContent='تمت إضافة التصنيف بنجاح.';msg.style.color='#047857';
+            } catch(e) { const msg=document.getElementById('productCategoriesAdminMsg');msg.textContent='تعذر إضافة التصنيف: '+dbErrorMessage(e);msg.style.color='#dc2626'; }
+        }
+        async function deleteProductCategory(id) {
+            if(!id||!confirm('حذف التصنيف؟ المنتجات المرتبطة به ستظل موجودة، وستظهر ضمن «الكل» حتى تعيد تصنيفها.'))return;
+            if(!isAdminReady())return alert('يجب تسجيل الدخول أولاً.');
+            try { await db.ref('settings/productCategories/'+id).remove(); }
+            catch(e) { alert('تعذر حذف التصنيف: '+dbErrorMessage(e)); }
+        }
+
         function renderGames(snap) {
             globalGames = snap.exists() ? (snap.val() || {}) : {};
             let html = '', selectHtml = '';
@@ -1414,6 +1459,7 @@
                 const newData = {
                     name,
                     img:finalImgUrl,
+                    categoryId:document.getElementById('gCategory').value || '',
                     kind,
                     external_url: kind === 'external' ? externalUrl : '',
                     external_url_b64: kind === 'external' ? btoa(unescape(encodeURIComponent(externalUrl))) : '',
@@ -1458,6 +1504,7 @@
             const g = globalGames[id];
 
             document.getElementById('gName').value = g.name || '';
+            document.getElementById('gCategory').value = g.categoryId || '';
             document.getElementById('gKind').value = g.kind || 'prices';
             document.getElementById('gExternalUrl').value = g.external_url || '';
             document.getElementById('gExternalMode').value = g.external_mode || 'embed';
@@ -1490,6 +1537,7 @@
 
         function cancelEdit() {
             editingGameId = null;
+            document.getElementById('gCategory').value = '';
             document.getElementById('gIdAutoUsd').checked = true;
             document.getElementById('gAccAutoUsd').checked = true;
             document.getElementById('saveGameBtn').innerHTML = "<i class='fas fa-cloud-upload-alt'></i> حفظ المنتج في السيستم";
@@ -2304,6 +2352,7 @@
 
             const gamesRef = db.ref('games');
             safeListener(gamesRef, renderGames);
+            safeListener(db.ref('settings/productCategories'), renderProductCategoriesAdmin);
 
             const cooldownRef = db.ref('settings/discount_cooldown_hours');
             safeListener(cooldownRef, snap => {
