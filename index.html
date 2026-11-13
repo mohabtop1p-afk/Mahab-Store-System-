@@ -777,7 +777,7 @@
 
             <div class="wallet-subpanel" id="wallet-panel-users"><div class="form-section" style="border-top:4px solid #0891b2;">
                 <h3><i class="fas fa-users" style="color:#0891b2"></i> إدارة أرصدة المستخدمين</h3>
-                <p style="color:var(--text-light);line-height:1.8;font-size:.9rem">ابحث باسم المستخدم أو البريد أو UID أو كود المستخدم، واعرف طريقة التسجيل وأدر الرصيد. كل تعديل يُسجّل في سجل العمليات.</p>
+                <p style="color:var(--text-light);line-height:1.8;font-size:.9rem">ابحث باسم المستخدم أو البريد أو UID أو كود المستخدم، واعرف طريقة التسجيل وأدر الرصيد. كل تعديل يُسجّل في سجل العمليات.</p><p style="color:var(--text-light);line-height:1.8;font-size:.84rem;background:rgba(14,165,233,.08);border:1px solid rgba(14,165,233,.2);border-radius:12px;padding:11px 13px">ملاحظة أمان: كلمات المرور لا يمكن عرضها أو استرجاعها من Firebase Authentication. عند نسيانها استخدم إجراء إعادة تعيين كلمة المرور؛ لا يتم تخزينها كنص ظاهر داخل لوحة الإدارة.</p>
                 <div class="row"><div style="flex:2"><input id="walletUserSearch" type="search" placeholder="بحث باسم المستخدم أو البريد أو UID أو كود المستخدم" oninput="renderWalletUsers()"></div><div><button class="btn-small" type="button" onclick="refreshWalletUsers()"><i class="fas fa-sync"></i> تحديث المستخدمين</button></div></div>
                 <div class="row" style="margin:14px 0"><div><label>رابط صورة الحظر (اختياري)</label><input id="walletBanImageUrl" placeholder="https://.../ban-image.png"><label>أو اختر صورة من جهازك</label><input id="walletBanImageFile" type="file" accept="image/*"></div><div style="display:flex;align-items:end"><button class="btn-small" type="button" onclick="saveWalletVisualSettings()">حفظ صورة الحظر</button></div></div>
                 <div class="row" style="margin:10px 0"><div><label>رابط صورة الحساب المتحركة (GIF أو صورة)</label><input id="walletProfileAvatarUrl" placeholder="https://.../avatar.gif"><label>أو اختر صورة من جهازك (يدعم GIF)</label><input id="walletProfileAvatarFile" type="file" accept="image/*"></div><div style="display:flex;align-items:end"><button class="btn-small" type="button" onclick="saveWalletVisualSettings()">حفظ صورة الحساب</button></div></div>
@@ -2124,7 +2124,7 @@
                 const visualSnap=await db.ref('wallet_settings').once('value');const visuals=visualSnap.val()||{};const banInput=document.getElementById('walletBanImageUrl'),avatarInput=document.getElementById('walletProfileAvatarUrl');if(banInput)banInput.value=visuals.banImageUrl||'';if(avatarInput)avatarInput.value=visuals.profileAvatarUrl||'';
                 renderWalletUsers();
             } catch(e) {
-                if(box) box.innerHTML='<div class="request-empty" style="color:#dc2626">تعذر تحميل المستخدمين: '+walletAdminEscape(dbErrorMessage(e))+'<br>تأكد من إضافة صلاحية قراءة wallet_users لحساب الإدارة في قواعد Firebase.</div>';
+                if(box) box.innerHTML='<div class="request-empty" style="color:#dc2626">تعذر تحميل المستخدمين: '+walletAdminEscape(dbErrorMessage(e))+'<br>تأكد أن حساب الإدارة هو '+walletAdminEscape(AUTHORIZED_EMAIL)+' وأن قواعد Realtime Database تسمح له بقراءة wallet_users، مع السماح لكل مستخدم بقراءة سجله فقط.</div>';
             }
         }
         function walletReadImageFile(inputId){return new Promise((resolve,reject)=>{const file=document.getElementById(inputId)?.files?.[0];if(!file)return resolve(null);if(!file.type.startsWith('image/'))return reject(new Error('الملف المختار ليس صورة.'));if(file.size>800*1024)return reject(new Error('حجم الصورة يجب ألا يتجاوز 800 كيلوبايت.'));const reader=new FileReader();reader.onload=()=>resolve(String(reader.result));reader.onerror=()=>reject(new Error('تعذرت قراءة الصورة.'));reader.readAsDataURL(file);});}
@@ -2352,7 +2352,7 @@
                 renderWalletUsers();
             }, error => {
                 const box=document.getElementById('walletUsersList');
-                if(box) box.innerHTML='<div class="request-empty" style="color:#dc2626">تعذر تحميل المستخدمين: '+walletAdminEscape(dbErrorMessage(error))+'<br>يجب السماح لحساب الإدارة بقراءة المسار wallet_users بالكامل.</div>';
+                if(box) box.innerHTML='<div class="request-empty" style="color:#dc2626">تعذر تحميل المستخدمين: '+walletAdminEscape(dbErrorMessage(error))+'<br>تأكد أن حساب الإدارة هو '+walletAdminEscape(AUTHORIZED_EMAIL)+' وأن قواعد Realtime Database تسمح له بقراءة wallet_users، مع السماح لكل مستخدم بقراءة سجله فقط.</div>';
             });
             safeListener(db.ref('wallet_deposits'), renderWalletDeposits, error => {
                 const list = document.getElementById('walletDepositsList');
