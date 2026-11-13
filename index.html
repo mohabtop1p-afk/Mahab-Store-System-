@@ -983,9 +983,14 @@
 
         function dbErrorMessage(error) {
             console.error('Firebase:', error);
-            if (error && error.code === 'PERMISSION_DENIED') return 'ليس لديك صلاحية للوصول إلى البيانات.';
+            const code = String(error && error.code || '').toLowerCase();
+            const message = String(error && error.message || '').toLowerCase();
+            if (code.includes('permission') || message.includes('permission_denied') || message.includes('permission denied'))
+                return 'رفضت قواعد Firebase صلاحية القراءة لهذا القسم. راجع صلاحية قراءة المسار المطلوب لحساب الإدارة.';
+            if (code.includes('network') || message.includes('network'))
+                return 'تعذر الاتصال بالإنترنت أو بخدمة Firebase. تحقق من الاتصال ثم أعد المحاولة.';
             if (error && error.message) return error.message;
-            return 'حدث خطأ في الاتصال بقاعدة البيانات.';
+            return 'حدث خطأ غير معروف أثناء الاتصال بقاعدة البيانات.';
         }
 
         function safeListener(ref, onValue, onError) {
@@ -2090,8 +2095,10 @@
 
         function refreshWalletOrders() {
             if (!isAdminReady()) return alert('يجب تسجيل الدخول أولاً.');
+            const list = document.getElementById('walletOrdersList');
+            if (list) list.innerHTML = '<div class="request-empty">جاري تحديث عمليات الشراء…</div>';
             db.ref('wallet_orders').once('value').then(renderWalletOrders).catch(e => {
-                document.getElementById('walletOrdersList').innerHTML = '<div class="request-empty">تعذر تحميل العمليات: ' + walletAdminEscape(dbErrorMessage(e)) + '</div>';
+                if (list) list.innerHTML = '<div class="request-empty" style="color:#dc2626">تعذر تحميل العمليات: ' + walletAdminEscape(dbErrorMessage(e)) + '</div>';
             });
         }
 
@@ -2104,7 +2111,18 @@
         async function saveWalletMethod(){if(!isAdminReady())return alert('يجب تسجيل الدخول أولاً.');const old=document.getElementById('walletMethodEditKey').value;const key=(old||document.getElementById('walletMethodKey').value).trim().toLowerCase().replace(/[^a-z0-9_-]/g,'_');const label=document.getElementById('walletMethodName').value.trim(),target=document.getElementById('walletMethodTarget').value.trim(),logo=document.getElementById('walletMethodLogo').value.trim(),kind=document.getElementById('walletMethodKind').value,actionType=document.getElementById('walletMethodActionType').value,whatsappNumber=document.getElementById('walletMethodWhatsappNumber').value.trim().replace(/[^0-9+]/g,''),whatsappMessage=document.getElementById('walletMethodWhatsappMessage').value.trim();if(!key||!label)return alert('أدخل المعرّف الداخلي واسم طريقة الدفع.');if(actionType==='whatsapp'&&!whatsappNumber)return alert('أدخل رقم واتساب مع كود الدولة. مثال: 201125808758');if(actionType==='transfer'&&!target)return alert('أدخل رقم التحويل أو المعرّف.');if(logo&&!/^https:\/\//i.test(logo))return alert('رابط الشعار يجب أن يبدأ بـ https://');try{const previous=walletMethodsAdminCache[key]||{};await db.ref('wallet_settings/depositMethods/'+key).set({label,target,logo,kind,actionType,whatsappNumber,whatsappMessage,enabled:previous.enabled!==false,updatedAt:firebase.database.ServerValue.TIMESTAMP});clearWalletMethodForm();alert('تم حفظ طريقة الإيداع.');}catch(e){alert('تعذر حفظ الطريقة: '+dbErrorMessage(e));}}
         async function toggleWalletMethod(key){if(!isAdminReady())return;const m=walletMethodsAdminCache[key];if(!m)return;try{await db.ref('wallet_settings/depositMethods/'+key+'/enabled').set(m.enabled===false); }catch(e){alert('تعذر تحديث الطريقة: '+dbErrorMessage(e));}}
         async function deleteWalletMethod(key){if(!isAdminReady()||!confirm('حذف طريقة الإيداع '+key+'؟'))return;try{await db.ref('wallet_settings/depositMethods/'+key).remove();}catch(e){alert('تعذر حذف الطريقة: '+dbErrorMessage(e));}}
-        async function refreshWalletUsers(){if(!isAdminReady())return;const box=document.getElementById('walletUsersList');box.innerHTML='جاري تحميل المستخدمين…';try{const s=await db.ref('wallet_users').once('value');walletUsersAdminCache=s.val()||{};renderWalletUsers();}catch(e){box.innerHTML='تعذر تحميل المستخدمين: '+walletAdminEscape(dbErrorMessage(e));}}
+        async function refreshWalletUsers(){
+            if(!isAdminReady()) return alert('يجب تسجيل الدخول بحساب الإدارة أولاً.');
+            const box=document.getElementById('walletUsersList');
+            if(box) box.innerHTML='جاري تحديث قائمة المستخدمين…';
+            try {
+                const s=await db.ref('wallet_users').once('value');
+                walletUsersAdminCache=s.val()||{};
+                renderWalletUsers();
+            } catch(e) {
+                if(box) box.innerHTML='<div class="request-empty" style="color:#dc2626">تعذر تحميل المستخدمين: '+walletAdminEscape(dbErrorMessage(e))+'<br>تأكد من إضافة صلاحية قراءة wallet_users لحساب الإدارة في قواعد Firebase.</div>';
+            }
+        }
         function renderWalletUsers(){
             const box=document.getElementById('walletUsersList');if(!box)return;
             const q=(document.getElementById('walletUserSearch')?.value||'').toLowerCase().trim();
@@ -2321,12 +2339,21 @@
                 }
             });
             safeListener(db.ref('wallet_settings/depositMethods'), snap => { if(!snap.exists()){const defaults={vodafone:{label:'فودافون كاش',target:'01019614169',kind:'phone',logo:'',enabled:true},etisalat:{label:'اتصالات كاش',target:'01125808758',kind:'phone',logo:'',enabled:true},binance:{label:'Binance Pay',target:'1231533425',kind:'id',logo:'',enabled:true}};db.ref('wallet_settings/depositMethods').set(defaults).catch(e=>console.warn('تعذر إنشاء طرق الإيداع الافتراضية',e));return;} walletMethodsAdminCache=snap.val()||{}; renderWalletMethodsAdmin(); });
-            safeListener(db.ref('wallet_users'), snap => { walletUsersAdminCache=snap.val()||{}; renderWalletUsers(); });
+            safeListener(db.ref('wallet_users'), snap => {
+                walletUsersAdminCache=snap.val()||{};
+                renderWalletUsers();
+            }, error => {
+                const box=document.getElementById('walletUsersList');
+                if(box) box.innerHTML='<div class="request-empty" style="color:#dc2626">تعذر تحميل المستخدمين: '+walletAdminEscape(dbErrorMessage(error))+'<br>يجب السماح لحساب الإدارة بقراءة المسار wallet_users بالكامل.</div>';
+            });
             safeListener(db.ref('wallet_deposits'), renderWalletDeposits, error => {
                 const list = document.getElementById('walletDepositsList');
                 if (list) list.innerHTML = '<div class="request-empty" style="color:#fca5a5">تعذر تحميل طلبات الإيداع من قاعدة البيانات: ' + walletAdminEscape(dbErrorMessage(error)) + '<br>تأكد من صلاحيات قراءة wallet_deposits وأن الموقع والسيستم يستخدمان نفس مشروع Firebase.</div>';
             });
-            safeListener(db.ref('wallet_orders'), renderWalletOrders);
+            safeListener(db.ref('wallet_orders'), renderWalletOrders, error => {
+                const list=document.getElementById('walletOrdersList');
+                if(list) list.innerHTML='<div class="request-empty" style="color:#dc2626">تعذر تحميل طلبات الشحن والشراء: '+walletAdminEscape(dbErrorMessage(error))+'<br>راجع صلاحية قراءة wallet_orders لحساب الإدارة.</div>';
+            });
 
             safeListener(db.ref('settings/announcementTicker'), snap => renderAnnouncementTickerSettings(snap.val()||{}));
             safeListener(db.ref('settings/visuals'), snap => { loadVisualSettingsIntoForm(snap.val() || {}); });
