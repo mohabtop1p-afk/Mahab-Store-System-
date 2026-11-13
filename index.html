@@ -779,6 +779,8 @@
                 <h3><i class="fas fa-users" style="color:#0891b2"></i> إدارة أرصدة المستخدمين</h3>
                 <p style="color:var(--text-light);line-height:1.8;font-size:.9rem">ابحث باسم المستخدم أو البريد أو UID أو كود المستخدم، واعرف طريقة التسجيل وأدر الرصيد. كل تعديل يُسجّل في سجل العمليات.</p>
                 <div class="row"><div style="flex:2"><input id="walletUserSearch" type="search" placeholder="بحث باسم المستخدم أو البريد أو UID أو كود المستخدم" oninput="renderWalletUsers()"></div><div><button class="btn-small" type="button" onclick="refreshWalletUsers()"><i class="fas fa-sync"></i> تحديث المستخدمين</button></div></div>
+                <div class="row" style="margin:14px 0"><div><label>رابط صورة الحظر (اختياري)</label><input id="walletBanImageUrl" placeholder="https://.../ban-image.png"><label>أو اختر صورة من جهازك</label><input id="walletBanImageFile" type="file" accept="image/*"></div><div style="display:flex;align-items:end"><button class="btn-small" type="button" onclick="saveWalletVisualSettings()">حفظ صورة الحظر</button></div></div>
+                <div class="row" style="margin:10px 0"><div><label>رابط صورة الحساب المتحركة (GIF أو صورة)</label><input id="walletProfileAvatarUrl" placeholder="https://.../avatar.gif"><label>أو اختر صورة من جهازك (يدعم GIF)</label><input id="walletProfileAvatarFile" type="file" accept="image/*"></div><div style="display:flex;align-items:end"><button class="btn-small" type="button" onclick="saveWalletVisualSettings()">حفظ صورة الحساب</button></div></div>
                 <div id="walletUsersList" style="margin-top:14px">جاري تحميل المستخدمين…</div>
             </div></div>
 
@@ -2118,11 +2120,16 @@
             try {
                 const s=await db.ref('wallet_users').once('value');
                 walletUsersAdminCache=s.val()||{};
+                const bansSnap=await db.ref('wallet_bans').once('value');const bans=bansSnap.val()||{};Object.keys(walletUsersAdminCache).forEach(uid=>{walletUsersAdminCache[uid].banned=!!(bans[uid]&&bans[uid].banned);});
+                const visualSnap=await db.ref('wallet_settings').once('value');const visuals=visualSnap.val()||{};const banInput=document.getElementById('walletBanImageUrl'),avatarInput=document.getElementById('walletProfileAvatarUrl');if(banInput)banInput.value=visuals.banImageUrl||'';if(avatarInput)avatarInput.value=visuals.profileAvatarUrl||'';
                 renderWalletUsers();
             } catch(e) {
                 if(box) box.innerHTML='<div class="request-empty" style="color:#dc2626">تعذر تحميل المستخدمين: '+walletAdminEscape(dbErrorMessage(e))+'<br>تأكد من إضافة صلاحية قراءة wallet_users لحساب الإدارة في قواعد Firebase.</div>';
             }
         }
+        function walletReadImageFile(inputId){return new Promise((resolve,reject)=>{const file=document.getElementById(inputId)?.files?.[0];if(!file)return resolve(null);if(!file.type.startsWith('image/'))return reject(new Error('الملف المختار ليس صورة.'));if(file.size>800*1024)return reject(new Error('حجم الصورة يجب ألا يتجاوز 800 كيلوبايت.'));const reader=new FileReader();reader.onload=()=>resolve(String(reader.result));reader.onerror=()=>reject(new Error('تعذرت قراءة الصورة.'));reader.readAsDataURL(file);});}
+        async function saveWalletVisualSettings(){if(!isAdminReady())return alert('يجب تسجيل الدخول أولاً.');const ban=(document.getElementById('walletBanImageUrl').value||'').trim(),avatar=(document.getElementById('walletProfileAvatarUrl').value||'').trim();for(const url of [ban,avatar])if(url&&!/^https:\/\//i.test(url))return alert('يجب أن يبدأ الرابط بـ https://');try{const banFile=await walletReadImageFile('walletBanImageFile'),avatarFile=await walletReadImageFile('walletProfileAvatarFile');await db.ref('wallet_settings/banImageUrl').set(banFile||ban||null);await db.ref('wallet_settings/profileAvatarUrl').set(avatarFile||avatar||null);alert('تم حفظ إعدادات الصور.');}catch(e){alert('تعذر حفظ الصور: '+(e.message||dbErrorMessage(e)));}}
+        async function setWalletUserBan(uid,banned){if(!isAdminReady())return alert('يجب تسجيل الدخول بحساب الإدارة.');const user=walletUsersAdminCache[uid]||{};const label=user.username?'@'+user.username:uid;if(!confirm(`${banned?'تأكيد حظر':'تأكيد إلغاء حظر'} ${label}؟`))return;try{await db.ref('wallet_bans/'+uid).set(banned?{banned:true,updatedAt:firebase.database.ServerValue.TIMESTAMP,admin:auth.currentUser.email||''}:null);if(!walletUsersAdminCache[uid])walletUsersAdminCache[uid]={};walletUsersAdminCache[uid].banned=!!banned;renderWalletUsers();alert(banned?'تم حظر الحساب.':'تم إلغاء الحظر.');}catch(e){alert('تعذر تحديث الحظر: '+dbErrorMessage(e)+'\nتأكد من إضافة قواعد wallet_bans الموضحة أسفل الملفات.');}}
         function renderWalletUsers(){
             const box=document.getElementById('walletUsersList');if(!box)return;
             const q=(document.getElementById('walletUserSearch')?.value||'').toLowerCase().trim();
@@ -2144,6 +2151,7 @@
                         <strong style="font-size:1rem"><i class="fas fa-user-circle" style="color:#0891b2"></i> @${username}</strong>
                         <div class="wallet-admin-meta"><i class="${providerIcon}"></i> طريقة التسجيل: <b>${provider}</b></div>
                         <div class="wallet-admin-meta">كود المستخدم: <b>${walletAdminEscape(u.userCode||uid.slice(0,8).toUpperCase())}</b></div>
+                        ${u.banned?'<div style="color:#dc2626;font-weight:800;margin-top:6px">هذا الحساب محظور</div>':''}
                         <div class="wallet-admin-meta" style="direction:ltr;text-align:right;overflow-wrap:anywhere">UID: ${walletAdminEscape(uid)}</div>
                         ${u.email?`<div class="wallet-admin-meta">البريد المرتبط: ${walletAdminEscape(u.email)}</div>`:''}
                       </div>
@@ -2153,7 +2161,7 @@
                       <div><label>المبلغ بالدولار</label><input type="number" min="0.01" step="0.01" id="walletAdjAmt_${uid}" placeholder="مثال: 5.00"></div>
                       <div><label>ملاحظة العملية</label><input id="walletAdjNote_${uid}" placeholder="سبب الإضافة أو الخصم"></div>
                     </div>
-                    <div class="btn-group"><button class="btn-small btn-green" onclick="adjustWalletUser('${uid}',1)">إضافة رصيد</button><button class="btn-small btn-red" onclick="adjustWalletUser('${uid}',-1)">خصم رصيد</button></div>
+                    <div class="btn-group"><button class="btn-small btn-green" onclick="adjustWalletUser('${uid}',1)">إضافة رصيد</button><button class="btn-small btn-red" onclick="adjustWalletUser('${uid}',-1)">خصم رصيد</button><button class="btn-small ${u.banned?'btn-green':'btn-red'}" onclick="setWalletUserBan('${uid}',${u.banned?'false':'true'})">${u.banned?'إلغاء الحظر':'حظر الحساب'}</button></div>
                   </div>`;
             }).join('');
         }
