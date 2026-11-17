@@ -2593,7 +2593,16 @@
           <i class="fas fa-plug"></i> فحص الاتصال والرصيد
         </button>
       </div>
-      <div id="apiTestStatusMsg" style="margin-top:12px;font-size:0.88rem;line-height:1.8;color:#0f172a"></div>
+      <div id="apiBalanceCard" style="display:none;margin-top:14px;padding:16px;border-radius:14px;background:linear-gradient(135deg,#ecfdf5,#eff6ff);border:1px solid #86efac">
+        <div style="font-size:.85rem;color:#475569;margin-bottom:5px">رصيد حساب Mega Center</div>
+        <div id="apiBalanceValue" dir="auto" style="font-size:1.65rem;font-weight:800;color:#047857">—</div>
+        <div id="apiBalanceMeta" style="font-size:.82rem;color:#64748b;margin-top:5px"></div>
+      </div>
+      <div id="apiTestStatusMsg" role="status" aria-live="polite" style="margin-top:12px;font-size:0.88rem;line-height:1.8;color:#0f172a;overflow-wrap:anywhere"></div>
+      <details id="apiBalanceRawDetails" style="display:none;margin-top:8px">
+        <summary style="cursor:pointer;color:#64748b;font-size:.82rem">عرض استجابة المزود كاملة</summary>
+        <pre id="apiBalanceRaw" dir="ltr" style="white-space:pre-wrap;overflow-wrap:anywhere;background:#0f172a;color:#d1fae5;padding:10px;border-radius:8px;font-size:11px"></pre>
+      </details>
     `;
     generalTab.insertBefore(apiSection, generalTab.children[1]);
   }
@@ -2681,22 +2690,97 @@
 
   window.testAutoTopupApiConnection = async function() {
     const statusBox = document.getElementById('apiTestStatusMsg');
+    const balanceCard = document.getElementById('apiBalanceCard');
+    const balanceValue = document.getElementById('apiBalanceValue');
+    const balanceMeta = document.getElementById('apiBalanceMeta');
+    const rawDetails = document.getElementById('apiBalanceRawDetails');
+    const rawBox = document.getElementById('apiBalanceRaw');
     const workerUrl = document.getElementById('apiWorkerUrl').value.trim() || DEFAULT_WORKER_URL;
+
+    if (balanceCard) balanceCard.style.display = 'none';
+    if (rawDetails) rawDetails.style.display = 'none';
+    if (!firebase.auth().currentUser) {
+      statusBox.style.color = '#dc2626';
+      statusBox.textContent = 'يجب تسجيل الدخول بحساب الإدارة أولاً لفحص رصيد Mega Center.';
+      return;
+    }
+
     statusBox.style.color = '#0284c7';
-    statusBox.textContent = 'جاري الاتصال بـ Cloudflare Worker وميجا سنتر...';
+    statusBox.textContent = 'جاري الاتصال بـ Cloudflare Worker وطلب رصيد Mega Center...';
+    const testButton = document.querySelector('button[onclick="testAutoTopupApiConnection()"]');
+    if (testButton) { testButton.disabled = true; testButton.style.opacity = '.65'; }
+
     try {
-      const adminToken = firebase.auth().currentUser ? await firebase.auth().currentUser.getIdToken() : '';
+      const adminToken = await firebase.auth().currentUser.getIdToken(true);
       const res = await fetch(workerUrl, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + adminToken },
-        body: JSON.stringify({ action: 'balance' })
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + adminToken
+        },
+        body: JSON.stringify({ action: 'balance' }),
+        cache: 'no-store'
       });
-      const data = await res.json();
-      statusBox.style.color = data && data.status === true ? '#047857' : '#dc2626';
-      statusBox.textContent = (data && data.status === true ? 'تم الاتصال بنجاح: ' : 'فشل فحص الاتصال: ') + JSON.stringify(data);
+      const raw = await res.text();
+      let data;
+      try { data = JSON.parse(raw); }
+      catch (_) { throw new Error('استجابة Worker ليست JSON (HTTP ' + res.status + ').'); }
+
+      if (!res.ok || !data || data.status !== true) {
+        const reason = data && (data.message || data.error) ? (data.message || data.error) : ('HTTP ' + res.status);
+        throw new Error(reason);
+      }
+
+      // Mega Center may return the balance under different field names/nesting.
+      const balanceKeys = ['balance', 'credit', 'available_balance', 'availableBalance', 'account_balance', 'accountBalance'];
+      const queue = [data];
+      let foundBalance = null;
+      let foundKey = '';
+      let depth = 0;
+      while (queue.length && depth++ < 80 && foundBalance === null) {
+        const item = queue.shift();
+        if (!item || typeof item !== 'object') continue;
+        for (const key of balanceKeys) {
+          if (Object.prototype.hasOwnProperty.call(item, key) &&
+              item[key] !== null && item[key] !== '' &&
+              (typeof item[key] === 'number' || typeof item[key] === 'string')) {
+            foundBalance = item[key];
+            foundKey = key;
+            break;
+          }
+        }
+        if (foundBalance === null) {
+          Object.values(item).forEach(value => {
+            if (value && typeof value === 'object') queue.push(value);
+          });
+        }
+      }
+
+      statusBox.style.color = '#047857';
+      statusBox.textContent = 'تم الاتصال بنجاح بحساب Mega Center.';
+
+      if (foundBalance !== null && balanceCard) {
+        balanceValue.textContent = String(foundBalance);
+        balanceMeta.textContent = 'تم جلب الرصيد مباشرة من المزود (' + foundKey + ').';
+        balanceCard.style.display = 'block';
+      } else {
+        if (balanceCard) {
+          balanceValue.textContent = 'تم الاتصال';
+          balanceMeta.textContent = 'المزود لم يُرجع حقلاً واضحاً باسم الرصيد؛ راجع الاستجابة الكاملة بالأسفل.';
+          balanceCard.style.display = 'block';
+        }
+        statusBox.textContent += ' لم أتمكن من تحديد قيمة الرصيد تلقائياً من أسماء الحقول الموجودة في الاستجابة.';
+      }
+
+      if (rawDetails && rawBox) {
+        rawBox.textContent = JSON.stringify(data, null, 2);
+        rawDetails.style.display = 'block';
+      }
     } catch (e) {
       statusBox.style.color = '#dc2626';
-      statusBox.textContent = 'فشل الاتصال بالـ Worker: ' + e.message;
+      statusBox.textContent = 'فشل فحص رصيد Mega Center: ' + (e && e.message ? e.message : String(e));
+    } finally {
+      if (testButton) { testButton.disabled = false; testButton.style.opacity = '1'; }
     }
   };
 
