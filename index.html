@@ -8,6 +8,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-storage-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-messaging-compat.js"></script>
     
@@ -2555,7 +2556,7 @@
         db.ref('wallet_discount_settings').on('value',snap=>renderWalletDiscountSettings(snap.val()));
 
     </script>
-<!-- ==================== لوحة التحكم في الـ API والشحن التلقائي (Mega Center) ==================== -->
+<!-- ==================== لوحة التحكم في الشحن التلقائي ==================== -->
 <script>
 (function(){
   const DEFAULT_WORKER_URL = 'https://fragrant-mouse-e163.mohabtop1p.workers.dev';
@@ -2566,7 +2567,7 @@
     apiSection.className = 'form-section';
     apiSection.style.borderTop = '4px solid #10b981';
     apiSection.innerHTML = `
-      <h3><i class="fas fa-bolt" style="color:#10b981"></i> إعدادات الشحن التلقائي والـ API (Mega Center)</h3>
+      <h3><i class="fas fa-bolt" style="color:#10b981"></i> إعدادات الشحن التلقائي والاتصال</h3>
       <p style="color:#64748b;line-height:1.8;font-size:0.9rem">
         مفتاح الـ API الخاص بك محفوظ ومشفر داخل Cloudflare Worker تحت اسم <code>TOPUP_API_KEY</code> ولا يظهر في الموقع نهائياً.
       </p>
@@ -2581,7 +2582,7 @@
         </div>
         <div style="flex:1">
           <label>حالة المصادقة:</label>
-          <input type="text" value="بيانات Mega Center محفوظة كـ Secrets داخل Cloudflare Worker" readonly>
+          <input type="text" value="بيانات الاتصال محفوظة بأمان داخل الخادم" readonly>
         </div>
       </div>
 
@@ -2594,13 +2595,13 @@
         </button>
       </div>
       <div id="apiBalanceCard" style="display:none;margin-top:14px;padding:16px;border-radius:14px;background:linear-gradient(135deg,#ecfdf5,#eff6ff);border:1px solid #86efac">
-        <div style="font-size:.85rem;color:#475569;margin-bottom:5px">رصيد حساب Mega Center</div>
+        <div style="font-size:.85rem;color:#475569;margin-bottom:5px">رصيد حساب الشحن</div>
         <div id="apiBalanceValue" dir="auto" style="font-size:1.65rem;font-weight:800;color:#047857">—</div>
         <div id="apiBalanceMeta" style="font-size:.82rem;color:#64748b;margin-top:5px"></div>
       </div>
       <div id="apiTestStatusMsg" role="status" aria-live="polite" style="margin-top:12px;font-size:0.88rem;line-height:1.8;color:#0f172a;overflow-wrap:anywhere"></div>
       <details id="apiBalanceRawDetails" style="display:none;margin-top:8px">
-        <summary style="cursor:pointer;color:#64748b;font-size:.82rem">عرض استجابة المزود كاملة</summary>
+        <summary style="cursor:pointer;color:#64748b;font-size:.82rem">عرض تفاصيل الاستجابة</summary>
         <pre id="apiBalanceRaw" dir="ltr" style="white-space:pre-wrap;overflow-wrap:anywhere;background:#0f172a;color:#d1fae5;padding:10px;border-radius:8px;font-size:11px"></pre>
       </details>
     `;
@@ -2631,9 +2632,18 @@
           <input type="text" id="gAutoSubtitle" placeholder="مثال: يصلك الشحن في ثوانٍ عبر الـ ID">
         </div>
         <div>
-          <label>نوع اللعبة لفحص الاسم:</label>
-          <select id="gAutoGameCode"><option value="">بدون فحص اسم تلقائي</option><option value="freefire">Free Fire</option></select>
-          <small style="color:#64748b">الاستعلام عن الاسم متاح حالياً لفري فاير فقط، ولا ينشئ طلب شحن.</small>
+          <label>نوع اللعبة للتحقق من الحساب:</label>
+          <select id="gAutoGameCode">
+            <option value="">لعبة أخرى / تحقق عام من ID</option>
+            <option value="freefire">Free Fire</option>
+            <option value="pubgmobile">PUBG Mobile</option>
+            <option value="mobilelegends">Mobile Legends</option>
+            <option value="codmobile">Call of Duty Mobile</option>
+            <option value="genshinimpact">Genshin Impact</option>
+            <option value="roblox">Roblox</option>
+            <option value="other">لعبة أخرى</option>
+          </select>
+          <small style="color:#64748b">يتم إظهار اسم الحساب عند توفر تحقق رسمي للعبة. الألعاب الأخرى تقبل رقم/معرّف الحساب دون الادعاء بأنه تم التحقق من الاسم.</small>
         </div>
         <div>
           <label>اسم حقل اللاعب:</label>
@@ -2644,6 +2654,18 @@
           <input type="text" id="gAutoZoneLabel" value="Zone ID" placeholder="Zone ID">
           <label class="toggle-line"><input type="checkbox" id="gAutoZoneRequired"><span>إلزام العميل بإدخال Zone ID</span></label>
           <small style="color:#64748b;display:block;margin-top:5px">ملاحظة: فري فاير يعتمد على Player ID فقط ولا يحتاج Zone ID؛ سيُخفى هذا الحقل تلقائياً عند اختيار Free Fire.</small>
+        </div>
+      </div>
+      <div class="row">
+        <div>
+          <label>أيقونة باقات الشحن التلقائي (ارفع صورة من جهازك أو ضع رابطاً):</label>
+          <input type="url" id="gAutoIcon" placeholder="https://.../game-package.png" dir="ltr">
+          <input type="file" id="gAutoIconFile" class="file-input" accept="image/png,image/jpeg,image/webp,image/gif">
+          <div id="gAutoIconPreview" style="display:none;margin-top:10px;align-items:center;gap:10px">
+            <img id="gAutoIconPreviewImg" alt="معاينة الأيقونة" style="width:58px;height:58px;object-fit:contain;border-radius:12px;background:#f8fafc;border:1px solid #cbd5e1;padding:5px">
+            <small style="color:#64748b">معاينة الأيقونة التي ستظهر داخل كل باقة.</small>
+          </div>
+          <small style="color:#64748b;display:block;margin-top:5px">يمكنك تغيير الصورة لكل لعبة من هنا، وستظهر بجوار جميع باقات الشحن التلقائي.</small>
         </div>
       </div>
       <div class="row">
@@ -2701,12 +2723,12 @@
     if (rawDetails) rawDetails.style.display = 'none';
     if (!firebase.auth().currentUser) {
       statusBox.style.color = '#dc2626';
-      statusBox.textContent = 'يجب تسجيل الدخول بحساب الإدارة أولاً لفحص رصيد Mega Center.';
+      statusBox.textContent = 'يجب تسجيل الدخول بحساب الإدارة أولاً لفحص الرصيد.';
       return;
     }
 
     statusBox.style.color = '#0284c7';
-    statusBox.textContent = 'جاري الاتصال بـ Cloudflare Worker وطلب رصيد Mega Center...';
+    statusBox.textContent = 'جاري الاتصال وطلب الرصيد...';
     const testButton = document.querySelector('button[onclick="testAutoTopupApiConnection()"]');
     if (testButton) { testButton.disabled = true; testButton.style.opacity = '.65'; }
 
@@ -2731,7 +2753,7 @@
         throw new Error(reason);
       }
 
-      // Mega Center may return the balance under different field names/nesting.
+      // قد تختلف أسماء حقول الرصيد أو مستوياتها داخل الاستجابة.
       const balanceKeys = ['balance', 'credit', 'available_balance', 'availableBalance', 'account_balance', 'accountBalance'];
       const queue = [data];
       let foundBalance = null;
@@ -2757,16 +2779,16 @@
       }
 
       statusBox.style.color = '#047857';
-      statusBox.textContent = 'تم الاتصال بنجاح بحساب Mega Center.';
+      statusBox.textContent = 'تم الاتصال بنجاح.';
 
       if (foundBalance !== null && balanceCard) {
         balanceValue.textContent = String(foundBalance);
-        balanceMeta.textContent = 'تم جلب الرصيد مباشرة من المزود (' + foundKey + ').';
+        balanceMeta.textContent = 'تم جلب الرصيد مباشرة (' + foundKey + ').';
         balanceCard.style.display = 'block';
       } else {
         if (balanceCard) {
           balanceValue.textContent = 'تم الاتصال';
-          balanceMeta.textContent = 'المزود لم يُرجع حقلاً واضحاً باسم الرصيد؛ راجع الاستجابة الكاملة بالأسفل.';
+          balanceMeta.textContent = 'لم تُرجع الخدمة حقلاً واضحاً باسم الرصيد؛ راجع الاستجابة الكاملة بالأسفل.';
           balanceCard.style.display = 'block';
         }
         statusBox.textContent += ' لم أتمكن من تحديد قيمة الرصيد تلقائياً من أسماء الحقول الموجودة في الاستجابة.';
@@ -2778,7 +2800,7 @@
       }
     } catch (e) {
       statusBox.style.color = '#dc2626';
-      statusBox.textContent = 'فشل فحص رصيد Mega Center: ' + (e && e.message ? e.message : String(e));
+      statusBox.textContent = 'فشل فحص الرصيد: ' + (e && e.message ? e.message : String(e));
     } finally {
       if (testButton) { testButton.disabled = false; testButton.style.opacity = '1'; }
     }
@@ -2797,6 +2819,8 @@
     document.getElementById('gAutoZoneRequired').checked = g.auto_zone_required === true;
     document.getElementById('gAutoPrices').value = g.auto_prices || '';
     document.getElementById('gAutoPricesUsd').value = g.auto_prices_usd || '';
+    document.getElementById('gAutoIcon').value = g.auto_icon || '';
+    if (g.auto_icon) { document.getElementById('gAutoIconPreviewImg').src = g.auto_icon; document.getElementById('gAutoIconPreview').style.display = 'flex'; } else { document.getElementById('gAutoIconPreview').style.display = 'none'; }
     document.getElementById('gAutoConvertUsd').checked = g.auto_auto_usd !== false;
   };
 
@@ -2813,9 +2837,55 @@
       document.getElementById('gAutoZoneRequired').checked = false;
       document.getElementById('gAutoPrices').value = '';
       document.getElementById('gAutoPricesUsd').value = '';
+      document.getElementById('gAutoIcon').value = '';
+      document.getElementById('gAutoIconFile').value = '';
+      document.getElementById('gAutoIconPreview').style.display = 'none';
       document.getElementById('gAutoConvertUsd').checked = true;
     }
   };
+
+
+  // رفع أيقونة باقات الشحن التلقائي من داخل لوحة التحكم.
+  window.uploadAutoTopupIcon = async function() {
+    const fileInput = document.getElementById('gAutoIconFile');
+    const file = fileInput && fileInput.files && fileInput.files[0];
+    if (!file) return '';
+    if (!/^image\/(png|jpeg|webp|gif)$/.test(file.type)) throw new Error('اختر صورة PNG أو JPG أو WEBP أو GIF.');
+    if (file.size > 2 * 1024 * 1024) throw new Error('حجم الأيقونة يجب ألا يتجاوز 2 ميجابايت.');
+    if (!firebase.storage) throw new Error('خدمة رفع الصور غير مفعّلة في Firebase Storage.');
+    const preview = document.getElementById('gAutoIconPreview');
+    const previewImg = document.getElementById('gAutoIconPreviewImg');
+    const localUrl = URL.createObjectURL(file);
+    previewImg.src = localUrl;
+    preview.style.display = 'flex';
+    const path = 'auto_topup_icons/' + (editingGameId || 'new-game') + '/' + Date.now() + '_' + file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+    const ref = firebase.storage().ref().child(path);
+    await ref.put(file, { contentType: file.type });
+    const url = await ref.getDownloadURL();
+    document.getElementById('gAutoIcon').value = url;
+    previewImg.src = url;
+    URL.revokeObjectURL(localUrl);
+    return url;
+  };
+  document.addEventListener('change', function(e) {
+    if (e.target && e.target.id === 'gAutoIconFile') {
+      const file = e.target.files && e.target.files[0];
+      if (!file) return;
+      const preview = document.getElementById('gAutoIconPreview');
+      const img = document.getElementById('gAutoIconPreviewImg');
+      img.src = URL.createObjectURL(file);
+      preview.style.display = 'flex';
+    }
+  });
+  document.addEventListener('input', function(e) {
+    if (e.target && e.target.id === 'gAutoIcon') {
+      const value = e.target.value.trim();
+      const preview = document.getElementById('gAutoIconPreview');
+      const img = document.getElementById('gAutoIconPreviewImg');
+      if (value) { img.src = value; preview.style.display = 'flex'; }
+      else preview.style.display = 'none';
+    }
+  });
 
   const origHandleSaveGame = window.handleSaveGame;
   window.handleSaveGame = async function() {
@@ -2830,8 +2900,11 @@
       auto_zone_required: document.getElementById('gAutoZoneRequired')?.checked === true,
       auto_prices: document.getElementById('gAutoPrices')?.value || '',
       auto_prices_usd: document.getElementById('gAutoPricesUsd')?.value || '',
+      auto_icon: (document.getElementById('gAutoIcon')?.value || '').trim(),
       auto_auto_usd: document.getElementById('gAutoConvertUsd')?.checked !== false
     };
+    try { if (document.getElementById('gAutoIconFile')?.files?.length) autoFields.auto_icon = await window.uploadAutoTopupIcon(); }
+    catch (iconError) { alert('تعذر رفع أيقونة الشحن التلقائي: ' + (iconError.message || iconError)); return; }
     await origHandleSaveGame();
     if (targetId) {
       await db.ref('games/' + targetId).update(autoFields);
