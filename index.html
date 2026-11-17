@@ -2580,16 +2580,11 @@
           <input type="url" id="apiWorkerUrl" value="${DEFAULT_WORKER_URL}" dir="ltr">
         </div>
         <div style="flex:1">
-          <label>اسم المستخدم في ميجا سنتر (Username):</label>
-          <input type="text" id="apiMegaUsername" placeholder="اسم حسابك في ميجا سنتر" dir="ltr">
+          <label>حالة المصادقة:</label>
+          <input type="text" value="بيانات Mega Center محفوظة كـ Secrets داخل Cloudflare Worker" readonly>
         </div>
       </div>
-      <div class="row">
-        <div style="flex:2">
-          <label>رابط الـ API الأساسي للمزود:</label>
-          <input type="url" id="apiEndpointUrl" value="https://megatec-center.com/api/rest.php" dir="ltr">
-        </div>
-      </div>
+
       <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px">
         <button type="button" class="action-btn" style="background:#10b981;flex:2" onclick="saveAutoTopupApiSettings()">
           <i class="fas fa-save"></i> حفظ إعدادات الـ API
@@ -2627,15 +2622,25 @@
           <input type="text" id="gAutoSubtitle" placeholder="مثال: يصلك الشحن في ثوانٍ عبر الـ ID">
         </div>
         <div>
-          <label>رقم خدمة فحص اسم اللاعب (Service ID اختياري):</label>
-          <input type="text" id="gAutoCheckServiceId" placeholder="مثال: 1100 (أو اتركه فارغاً لفري فاير)">
+          <label>نوع اللعبة لفحص الاسم:</label>
+          <select id="gAutoGameCode"><option value="">بدون فحص اسم تلقائي</option><option value="freefire">Free Fire</option></select>
+          <small style="color:#64748b">الاستعلام عن الاسم متاح حالياً لفري فاير فقط، ولا ينشئ طلب شحن.</small>
+        </div>
+        <div>
+          <label>اسم حقل اللاعب:</label>
+          <input type="text" id="gAutoPlayerLabel" value="Player ID" placeholder="Player ID">
+        </div>
+        <div>
+          <label>اسم حقل المنطقة:</label>
+          <input type="text" id="gAutoZoneLabel" value="Zone ID" placeholder="Zone ID">
+          <label class="toggle-line"><input type="checkbox" id="gAutoZoneRequired"><span>إلزام العميل بإدخال Zone ID</span></label>
         </div>
       </div>
       <div class="row">
         <div>
           <label>باقات وأسعار الشحن التلقائي (بالمصري) + رقم الخدمة في الـ API:</label>
           <textarea id="gAutoPrices" placeholder="اكتب كل باقة في سطر بالصيغة التالية:&#10;100 جوهرة = 50 ج | 1101&#10;310 جوهرة = 145 ج بدل 160 ج | 1102"></textarea>
-          <small style="color:#047857;display:block;margin-top:5px">الصيغة: <b>اسم الباقة = السعر | رقم الخدمة (Service ID) في ميجا سنتر</b></small>
+          <small style="color:#047857;display:block;margin-top:5px">الصيغة: <b>اسم الباقة = السعر | Service ID</b> ويمكن إضافة معاملات الخدمة اختيارياً: <b>| server_id=1&amp;region=ME</b></small>
           <label class="toggle-line" style="margin-top:8px">
             <input type="checkbox" id="gAutoConvertUsd" checked>
             <span>تحويل أسعار الشحن التلقائي للدولار تلقائياً</span>
@@ -2654,12 +2659,8 @@
     const d = snap.val() || {};
     const en = document.getElementById('apiAutoEnabled');
     const wu = document.getElementById('apiWorkerUrl');
-    const mu = document.getElementById('apiMegaUsername');
-    const eu = document.getElementById('apiEndpointUrl');
     if (en) en.checked = d.enabled !== false;
     if (wu) wu.value = d.workerUrl || DEFAULT_WORKER_URL;
-    if (mu && d.apiUser !== undefined) mu.value = d.apiUser;
-    if (eu && d.apiUrl) eu.value = d.apiUrl;
   });
 
   window.saveAutoTopupApiSettings = async function() {
@@ -2667,8 +2668,6 @@
     const data = {
       enabled: document.getElementById('apiAutoEnabled').checked,
       workerUrl: document.getElementById('apiWorkerUrl').value.trim() || DEFAULT_WORKER_URL,
-      apiUser: document.getElementById('apiMegaUsername').value.trim(),
-      apiUrl: document.getElementById('apiEndpointUrl').value.trim() || 'https://megatec-center.com/api/rest.php',
       updatedAt: firebase.database.ServerValue.TIMESTAMP
     };
     try {
@@ -2682,19 +2681,18 @@
   window.testAutoTopupApiConnection = async function() {
     const statusBox = document.getElementById('apiTestStatusMsg');
     const workerUrl = document.getElementById('apiWorkerUrl').value.trim() || DEFAULT_WORKER_URL;
-    const apiUser = document.getElementById('apiMegaUsername').value.trim();
-    const apiUrl = document.getElementById('apiEndpointUrl').value.trim() || 'https://megatec-center.com/api/rest.php';
     statusBox.style.color = '#0284c7';
     statusBox.textContent = 'جاري الاتصال بـ Cloudflare Worker وميجا سنتر...';
     try {
+      const adminToken = firebase.auth().currentUser ? await firebase.auth().currentUser.getIdToken() : '';
       const res = await fetch(workerUrl, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'balance', apiUrl, apiUser })
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + adminToken },
+        body: JSON.stringify({ action: 'balance' })
       });
       const data = await res.json();
-      statusBox.style.color = '#047857';
-      statusBox.textContent = 'رد الخادم: ' + JSON.stringify(data);
+      statusBox.style.color = data && data.status === true ? '#047857' : '#dc2626';
+      statusBox.textContent = (data && data.status === true ? 'تم الاتصال بنجاح: ' : 'فشل فحص الاتصال: ') + JSON.stringify(data);
     } catch (e) {
       statusBox.style.color = '#dc2626';
       statusBox.textContent = 'فشل الاتصال بالـ Worker: ' + e.message;
@@ -2708,7 +2706,10 @@
     document.getElementById('gAutoAvail').checked = !!g.auto_available;
     document.getElementById('gAutoTitle').value = g.auto_title || '';
     document.getElementById('gAutoSubtitle').value = g.auto_subtitle || '';
-    document.getElementById('gAutoCheckServiceId').value = g.auto_check_service_id || '';
+    document.getElementById('gAutoGameCode').value = g.auto_game_code || '';
+    document.getElementById('gAutoPlayerLabel').value = g.auto_player_label || 'Player ID';
+    document.getElementById('gAutoZoneLabel').value = g.auto_zone_label || 'Zone ID';
+    document.getElementById('gAutoZoneRequired').checked = g.auto_zone_required === true;
     document.getElementById('gAutoPrices').value = g.auto_prices || '';
     document.getElementById('gAutoPricesUsd').value = g.auto_prices_usd || '';
     document.getElementById('gAutoConvertUsd').checked = g.auto_auto_usd !== false;
@@ -2721,7 +2722,10 @@
       document.getElementById('gAutoAvail').checked = false;
       document.getElementById('gAutoTitle').value = '';
       document.getElementById('gAutoSubtitle').value = '';
-      document.getElementById('gAutoCheckServiceId').value = '';
+      document.getElementById('gAutoGameCode').value = '';
+      document.getElementById('gAutoPlayerLabel').value = 'Player ID';
+      document.getElementById('gAutoZoneLabel').value = 'Zone ID';
+      document.getElementById('gAutoZoneRequired').checked = false;
       document.getElementById('gAutoPrices').value = '';
       document.getElementById('gAutoPricesUsd').value = '';
       document.getElementById('gAutoConvertUsd').checked = true;
@@ -2735,7 +2739,10 @@
       auto_available: document.getElementById('gAutoAvail')?.checked || false,
       auto_title: (document.getElementById('gAutoTitle')?.value || '').trim(),
       auto_subtitle: (document.getElementById('gAutoSubtitle')?.value || '').trim(),
-      auto_check_service_id: (document.getElementById('gAutoCheckServiceId')?.value || '').trim(),
+      auto_game_code: (document.getElementById('gAutoGameCode')?.value || '').trim(),
+      auto_player_label: (document.getElementById('gAutoPlayerLabel')?.value || 'Player ID').trim(),
+      auto_zone_label: (document.getElementById('gAutoZoneLabel')?.value || 'Zone ID').trim(),
+      auto_zone_required: document.getElementById('gAutoZoneRequired')?.checked === true,
       auto_prices: document.getElementById('gAutoPrices')?.value || '',
       auto_prices_usd: document.getElementById('gAutoPricesUsd')?.value || '',
       auto_auto_usd: document.getElementById('gAutoConvertUsd')?.checked !== false
