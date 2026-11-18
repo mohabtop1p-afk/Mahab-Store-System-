@@ -308,6 +308,188 @@
         #adminNotificationToast.show{display:block;animation:slideUp .2s ease}
 
     </style>
+    <style id="mohab-mobile-pro-theme">
+    /* =====================================================================
+       MOHAB STORE — تنسيق احترافي مناسب للهاتف (تنسيق فقط، لا يغيّر أي بيانات أو منطق)
+       ===================================================================== */
+    :root{
+        --primary:#0ea5e9; --primary-hover:#0284c7; --primary-soft:rgba(14,165,233,.10);
+        --bg:#eef3f8; --surface:#ffffff; --text:#0f172a; --text-light:#64748b;
+        --border:#e3eaf2; --radius:18px;
+        --shadow:0 1px 2px rgba(15,23,42,.04),0 10px 28px -12px rgba(15,23,42,.12);
+    }
+    html{-webkit-text-size-adjust:100%}
+    body{background:var(--bg);line-height:1.65;-webkit-font-smoothing:antialiased}
+
+    /* ---------- الحاوية والعناوين ---------- */
+    .admin-container{max-width:860px;margin:18px auto;padding:0 14px 120px}
+    .admin-container > .tab-content > h2{
+        display:flex;align-items:center;gap:10px;font-size:1.3rem;font-weight:800;
+        margin:6px 2px 16px;color:var(--text)
+    }
+    .admin-container > .tab-content > h3{font-size:1.05rem;margin:22px 4px 12px;font-weight:800}
+
+    /* ---------- بطاقات الأقسام ---------- */
+    .form-section{
+        border-radius:var(--radius);padding:18px;margin-bottom:14px;
+        border:1px solid var(--border);box-shadow:var(--shadow)
+    }
+    .form-section p{font-size:.88rem}
+    .form-section > h3{font-size:1.02rem;font-weight:800;line-height:1.5}
+
+    /* ---------- أقسام قابلة للطي ---------- */
+    .form-section.fs-collapsible > h3{
+        cursor:pointer;display:flex;align-items:center;gap:10px;margin:0;
+        padding-inline-end:34px;position:relative;user-select:none;-webkit-user-select:none;min-height:30px
+    }
+    .form-section.fs-collapsible > h3::after{
+        content:"\f078";font-family:"Font Awesome 6 Free";font-weight:900;font-size:.78rem;
+        position:absolute;inset-inline-end:2px;top:50%;transform:translateY(-50%);
+        width:28px;height:28px;border-radius:50%;background:#f1f5f9;color:var(--text-light);
+        display:flex;align-items:center;justify-content:center;transition:transform .25s ease,background .2s
+    }
+    .form-section.fs-collapsible.fs-open > h3{margin-bottom:16px;padding-bottom:14px;border-bottom:1px solid var(--border)}
+    .form-section.fs-collapsible.fs-open > h3::after{transform:translateY(-50%) rotate(180deg);background:var(--primary-soft);color:var(--primary)}
+    .form-section.fs-collapsible:not(.fs-open) > :not(h3){display:none !important}
+
+    /* ---------- الحقول ---------- */
+    label{font-size:.88rem;font-weight:700;color:#334155;margin-bottom:7px}
+    input[type="text"],input[type="url"],input[type="number"],input[type="search"],input[type="email"],input[type="password"],select,textarea{
+        width:100%;min-height:48px;padding:12px 14px;font-size:16px;border-radius:14px;
+        border:1.5px solid #d6dfeb;background:#f8fafc;font-family:inherit;box-sizing:border-box
+    }
+    input[type="search"]{-webkit-appearance:none;appearance:none}
+    textarea{min-height:110px;line-height:1.7}
+    input:focus,textarea:focus,select:focus{border-color:var(--primary);box-shadow:0 0 0 4px rgba(14,165,233,.14);background:#fff}
+    input[type="file"]{
+        width:100%;box-sizing:border-box;margin-top:8px;padding:10px;font-family:inherit;font-size:.85rem;
+        border:2px dashed #cbd5e1;border-radius:14px;background:#f8fafc;color:#475569
+    }
+    input[type="file"]::file-selector-button{
+        background:var(--primary);color:#fff;border:0;padding:9px 14px;border-radius:10px;
+        font-family:inherit;font-weight:700;margin-inline-end:12px;cursor:pointer
+    }
+    input[type="color"]{border-radius:12px;cursor:pointer}
+    .file-upload-wrapper{margin-top:0}
+    small{line-height:1.7}
+
+    /* مفاتيح التفعيل بشكل بطاقة سهلة اللمس */
+    label.toggle-line{
+        display:flex;align-items:center;gap:12px;padding:12px 14px;min-height:48px;margin:0;
+        background:#f8fafc;border:1.5px solid var(--border);border-radius:14px;font-weight:700;color:var(--text)
+    }
+    label.toggle-line input[type="checkbox"]{width:22px;height:22px;flex:0 0 auto;accent-color:var(--primary)}
+    .welcome-popup-settings{padding:14px;border-radius:16px}
+
+    /* ---------- الأزرار ---------- */
+    button.action-btn{min-height:50px;border-radius:14px;font-size:1rem;box-shadow:0 8px 18px -8px rgba(14,165,233,.55)}
+    button.action-btn:active{transform:scale(.985)}
+    .btn-small{
+        min-height:42px;border-radius:12px;padding:10px 14px;font-size:.88rem;
+        display:inline-flex;align-items:center;justify-content:center;gap:6px
+    }
+    .btn-small:not(.btn-red):not(.btn-yellow):not(.btn-green){background:#0284c7}
+    .btn-small:active{transform:scale(.97)}
+    .btn-group{flex-wrap:wrap}
+    .row{gap:12px;margin-bottom:12px}
+    @media(hover:none){
+        button.action-btn:hover,.admin-card:hover,.request-delete-btn:hover{transform:none}
+    }
+
+    /* ---------- البطاقات (القوائم) ---------- */
+    .admin-card{border-radius:16px;padding:14px;gap:12px;box-shadow:none;border:1px solid var(--border);margin-bottom:10px}
+    .admin-card:hover{transform:none;box-shadow:var(--shadow)}
+    .admin-card img{max-width:100%}
+    .request-card{border-radius:14px}
+    .custom-method-item{border-radius:14px;padding:14px}
+    .badge{font-size:.8rem}
+
+    /* ---------- فحص الأكواد ---------- */
+    .verify-box{padding:20px;border-radius:var(--radius)}
+    .verify-box h2{font-size:1.2rem !important}
+    .verify-box input{font-size:1.05rem}
+    .d-row{gap:10px;flex-wrap:wrap}
+
+    /* ---------- معلومات الـ API ---------- */
+    #apiInfoCard{display:none;margin-top:14px;border:1px solid #bae6fd;border-radius:16px;background:#f0f9ff;overflow:hidden}
+    #apiInfoCard .api-info-head{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 14px;background:#e0f2fe;font-weight:800;color:#075985;font-size:.92rem}
+    #apiInfoCard .api-info-head button{min-height:34px;padding:6px 12px;font-size:.78rem}
+    #apiInfoCard .api-info-grid{display:grid;grid-template-columns:1fr;gap:0}
+    #apiInfoCard .api-info-item{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;padding:11px 14px;border-top:1px solid #dbeafe;font-size:.86rem}
+    #apiInfoCard .api-info-key{color:#475569;font-weight:700;flex:0 0 42%;overflow-wrap:anywhere}
+    #apiInfoCard .api-info-val{color:#0f172a;font-weight:800;text-align:left;direction:ltr;overflow-wrap:anywhere;flex:1}
+    #apiInfoCard .api-info-note{padding:10px 14px;font-size:.78rem;color:#64748b;border-top:1px solid #dbeafe;line-height:1.7}
+
+    /* ---------- التبويبات الفرعية للمحفظة ---------- */
+    .wallet-subtabs{border-radius:16px;background:#e6eef6;margin-bottom:14px}
+    .wallet-subtab-btn{border-radius:12px;min-height:42px}
+
+    /* ---------- الإشعار المنبثق ---------- */
+    #adminNotificationToast{border-radius:16px}
+
+    /* ===================== الشاشات الكبيرة ===================== */
+    @media(min-width:769px){
+        .admin-nav{padding:12px 20px}
+        .tab-btn{padding:10px 20px}
+        .row > div{min-width:200px}
+        .api-info-grid{grid-template-columns:1fr 1fr !important}
+    }
+
+    /* ===================== الهاتف ===================== */
+    @media(max-width:768px){
+        .admin-container{margin:0 auto;padding:68px 12px 120px}
+
+        /* شريط علوي ثابت بدل الزر العائم */
+        .admin-user-bar{
+            top:0 !important;left:0 !important;right:0 !important;border-radius:0 0 18px 18px;
+            justify-content:space-between;gap:10px;padding:10px 14px;padding-top:calc(10px + env(safe-area-inset-top,0px));
+            border:0;border-bottom:1px solid var(--border);box-shadow:0 4px 18px rgba(15,23,42,.06);
+            background:rgba(255,255,255,.96);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px)
+        }
+        .admin-user-bar span{display:block !important;order:1;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text-light);font-size:.76rem;direction:ltr;text-align:right}
+        .admin-user-bar::before{content:"MOHAB STORE";order:2;font-weight:800;font-size:.9rem;color:var(--primary);letter-spacing:.5px}
+        .admin-user-bar button{order:3;min-height:36px}
+
+        /* شريط التنقل السفلي */
+        .admin-nav{
+            border-radius:22px 22px 0 0;padding:6px 6px calc(6px + env(safe-area-inset-bottom,0px));
+            gap:2px;box-shadow:0 -8px 28px rgba(15,23,42,.10)
+        }
+        .tab-btn{
+            padding:8px 2px !important;font-size:.66rem !important;line-height:1.25;gap:4px !important;
+            border-radius:14px;min-width:0;text-align:center;justify-content:center;font-weight:800
+        }
+        .tab-btn i{font-size:1.2rem !important}
+        .tab-btn.active{background:var(--primary-soft) !important}
+        .tab-btn.active i{transform:none}
+
+        .form-section{padding:16px;border-radius:16px}
+        .row{flex-direction:column;gap:12px}
+        .row > div{width:100%;min-width:100% !important;flex:1 1 auto !important}
+        .row > select,.row > input{width:100% !important;flex:1 1 auto !important}
+        .admin-card{flex-direction:column;align-items:stretch}
+        .btn-group{width:100%}
+        .btn-group .btn-small{flex:1 1 30%}
+
+        /* تبويبات المحفظة: شرائح تُسحب أفقياً */
+        .wallet-subtabs{
+            display:flex !important;flex-wrap:nowrap;overflow-x:auto;gap:8px;padding:8px;
+            position:sticky;top:56px;z-index:20;scrollbar-width:none;-webkit-overflow-scrolling:touch
+        }
+        .wallet-subtabs::-webkit-scrollbar{display:none}
+        .wallet-subtab-btn{flex:0 0 auto;white-space:nowrap;padding:10px 14px;font-size:.8rem}
+        .wallet-subtab-btn:last-child{grid-column:auto}
+
+        #adminNotificationToast{left:12px;right:12px;bottom:96px;max-width:none}
+        .welcome-popup-preview{flex-direction:column;align-items:flex-start}
+        .verify-box .row{flex-direction:column}
+        #apiInfoCard .api-info-key{flex-basis:40%}
+    }
+    </style>
+    <style id="mohab-flex-tab-css">
+    .mohab-flex-tab.active{display:flex;flex-direction:column}
+    .mohab-flex-tab > *{min-width:0}
+    </style>
 </head>
 <body>
     <div id="authGate">
@@ -2917,5 +3099,168 @@
   };
 })();
 </script>
+<script id="mohab-mobile-pro-addon">
+/* إضافات عرض فقط: ترتيب الأقسام + أقسام قابلة للطي + عرض معلومات الـ API.
+   لا تغيّر أي دالة أو بيانات أو ربط موجود في الملف. */
+(function(){
+  'use strict';
+  function $(id){ return document.getElementById(id); }
+  function sec(id){ var el=$(id); return el ? el.closest('.form-section') : null; }
+  function setOrder(el, n){ if(el) el.style.order = n; }
+
+  /* ---------- 1) ترتيب الأقسام داخل كل تبويب (ترتيب بصري فقط) ---------- */
+  function arrange(){
+    try{
+      var tabs = ['tab-general','tab-games','tab-discounts'];
+      tabs.forEach(function(id){
+        var t=$(id); if(!t) return;
+        t.classList.add('mohab-flex-tab');
+        Array.prototype.forEach.call(t.children,function(c){ c.style.order = 0; });
+      });
+
+      // الإعدادات: الاتصال ثم الهوية ثم المحتوى ثم التواصل ثم التخصيصات ثم الإشعارات
+      setOrder(sec('apiWorkerUrl'),1);
+      setOrder(sec('logoUrl'),2);
+      setOrder(sec('newBannerUrl'),3);
+      setOrder(sec('announcementTickerMessages'),4);
+      setOrder(sec('welcomePopupEnabled'),5);
+      setOrder(sec('socialPlatform'),6);
+      setOrder(sec('currencyEgpFlagUrl'),7);
+      setOrder(sec('visualFrameUrl'),8);
+      setOrder(sec('enableAdminNotificationsBtn'),9);
+
+      // المنتجات: نموذج إضافة/تعديل المنتج أولاً ثم التصنيفات ثم الدولار ثم القائمة
+      setOrder(sec('gName'),1);
+      setOrder(sec('newProductCategoryName'),2);
+      setOrder(sec('gameUsdRate'),3);
+      var gt=$('tab-games');
+      if(gt){
+        var gh=gt.querySelector(':scope > h3'); setOrder(gh,4);
+        setOrder($('gamesList'),5);
+      }
+
+      // الخصومات: الاستخدام اليومي أولاً ثم الإعدادات ثم الإجراء الخطير
+      var dt=$('tab-discounts');
+      if(dt){
+        setOrder(dt.querySelector(':scope > .verify-box'),1);
+        setOrder(sec('discGameSelect'),2);
+        var hs=dt.querySelectorAll(':scope > h3');
+        setOrder(hs[0],3); setOrder($('activeDiscountsList'),4);
+        setOrder(hs[1],5); setOrder($('recentCodesList'),6);
+        setOrder(sec('walletDiscountEnabled'),7);
+        setOrder(sec('cooldownHoursInput'),8);
+        setOrder(dt.querySelector('button[onclick="restartAllDiscounts()"]') && dt.querySelector('button[onclick="restartAllDiscounts()"]').closest('.form-section'),9);
+      }
+    }catch(e){ console.warn('arrange:',e); }
+  }
+
+  /* ---------- 2) أقسام قابلة للطي ---------- */
+  function makeCollapsible(){
+    try{
+      var openByDefault = [
+        'apiWorkerUrl',        // إعدادات الـ API
+        'discGameSelect',      // إطلاق خصم مباشر
+        'walletUsdToEgp',      // إعدادات العملة
+        'walletMethodName',    // طرق الإيداع
+        'walletUserSearch'     // المستخدمون
+      ].map(sec).filter(Boolean);
+
+      document.querySelectorAll('.form-section').forEach(function(s){
+        var h=s.firstElementChild;
+        if(!h || h.tagName!=='H3') return;
+        s.classList.add('fs-collapsible');
+        if(openByDefault.indexOf(s)>-1) s.classList.add('fs-open');
+        h.setAttribute('role','button');
+        h.setAttribute('tabindex','0');
+        h.addEventListener('click',function(){ s.classList.toggle('fs-open'); });
+        h.addEventListener('keydown',function(e){ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); s.classList.toggle('fs-open'); } });
+      });
+    }catch(e){ console.warn('collapsible:',e); }
+  }
+
+  /* ---------- 3) عرض كل بيانات الـ API بشكل مقروء ---------- */
+  var LABELS = {
+    balance:'الرصيد', credit:'الرصيد', available_balance:'الرصيد المتاح', availableBalance:'الرصيد المتاح',
+    account_balance:'رصيد الحساب', accountBalance:'رصيد الحساب', currency:'العملة', status:'الحالة',
+    message:'الرسالة', username:'اسم المستخدم', user:'المستخدم', name:'الاسم', email:'البريد',
+    id:'المعرّف', user_id:'معرّف المستخدم', created_at:'تاريخ الإنشاء', updated_at:'آخر تحديث',
+    limit:'الحد', daily_limit:'الحد اليومي', total:'الإجمالي', count:'العدد', orders:'الطلبات',
+    services:'الخدمات', discount:'الخصم', level:'المستوى', vip:'VIP', phone:'الهاتف', country:'الدولة'
+  };
+  function flatten(obj, prefix, out, depth){
+    if(out.length>=80 || depth>4) return;
+    if(Array.isArray(obj)){
+      if(!obj.length){ out.push([prefix,'—']); return; }
+      if(obj.every(function(x){return x===null||typeof x!=='object';})){
+        out.push([prefix, obj.slice(0,20).join('، ') + (obj.length>20?' …':'')]); return;
+      }
+      out.push([prefix, obj.length+' عنصر']);
+      obj.slice(0,10).forEach(function(it,i){ flatten(it, prefix+' #'+(i+1), out, depth+1); });
+      return;
+    }
+    if(obj && typeof obj==='object'){
+      Object.keys(obj).forEach(function(k){
+        var v=obj[k]; if(v===null||v===undefined||v==='') return;
+        var label = LABELS[k] || k;
+        var path = prefix ? (prefix+' › '+label) : label;
+        if(typeof v==='object') flatten(v, path, out, depth+1);
+        else out.push([path, String(v)]);
+      });
+      return;
+    }
+    out.push([prefix, String(obj)]);
+  }
+  function ensureInfoCard(){
+    var card=$('apiInfoCard');
+    if(card) return card;
+    var anchor=$('apiBalanceCard') || $('apiTestStatusMsg');
+    if(!anchor) return null;
+    card=document.createElement('div');
+    card.id='apiInfoCard';
+    card.innerHTML='<div class="api-info-head"><span><i class="fas fa-circle-info"></i> كل ما أرجعه الـ API عن حسابك</span><button type="button" class="btn-small" id="apiInfoCopyBtn"><i class="fas fa-copy"></i> نسخ</button></div><div class="api-info-grid" id="apiInfoGrid"></div><div class="api-info-note">هذه هي كل البيانات التي رجعت من الخدمة في آخر فحص، معروضة بترتيب سهل.</div>';
+    anchor.parentNode.insertBefore(card, anchor.nextSibling);
+    $('apiInfoCopyBtn').addEventListener('click',function(){
+      var raw=$('apiBalanceRaw'); if(!raw) return;
+      var txt=raw.textContent||'';
+      function done(){ var b=$('apiInfoCopyBtn'); var old=b.innerHTML; b.innerHTML='<i class="fas fa-check"></i> تم'; setTimeout(function(){b.innerHTML=old;},1500); }
+      if(navigator.clipboard && navigator.clipboard.writeText){ navigator.clipboard.writeText(txt).then(done,function(){}); }
+    });
+    return card;
+  }
+  function renderApiInfo(){
+    var card=ensureInfoCard(); if(!card) return;
+    var details=$('apiBalanceRawDetails'), raw=$('apiBalanceRaw');
+    if(!details || !raw || details.style.display!=='block'){ card.style.display='none'; return; }
+    var data; try{ data=JSON.parse(raw.textContent||''); }catch(_){ card.style.display='none'; return; }
+    var rows=[]; flatten(data,'',rows,0);
+    rows=rows.filter(function(r){ return r[0]!=='الحالة' || r[1]!=='true'; });
+    var grid=$('apiInfoGrid'); grid.textContent='';
+    rows.forEach(function(r){
+      var item=document.createElement('div'); item.className='api-info-item';
+      var k=document.createElement('span'); k.className='api-info-key'; k.textContent=r[0]||'—';
+      var v=document.createElement('span'); v.className='api-info-val'; v.textContent=r[1];
+      item.appendChild(k); item.appendChild(v); grid.appendChild(item);
+    });
+    card.style.display = rows.length ? 'block' : 'none';
+  }
+  function wrapApiTest(){
+    var orig=window.testAutoTopupApiConnection;
+    if(typeof orig!=='function' || orig.__mohabWrapped) return;
+    var wrapped=async function(){
+      var card=$('apiInfoCard'); if(card) card.style.display='none';
+      var r;
+      try{ r=await orig.apply(this,arguments); }
+      finally{ try{ renderApiInfo(); }catch(e){ console.warn(e); } }
+      return r;
+    };
+    wrapped.__mohabWrapped=true;
+    window.testAutoTopupApiConnection=wrapped;
+  }
+
+  function init(){ arrange(); makeCollapsible(); wrapApiTest(); }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',init); else init();
+})();
+</script>
+
 </body>
 </html>
