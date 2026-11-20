@@ -3432,11 +3432,11 @@
   }
   function methodsOf(game){
     var out=[];
-    if(String(game.id_prices||'').trim())out.push({key:'id',label:'شحن بالـ ID',text:game.id_prices});
-    if(String(game.account_prices||'').trim())out.push({key:'account',label:'شحن بالحساب',text:game.account_prices});
+    if(String(game.id_prices||'').trim())out.push({key:'id',label:'شحن بالـ ID',text:game.id_prices,usd:game.id_prices_usd});
+    if(String(game.account_prices||'').trim())out.push({key:'account',label:'شحن بالحساب',text:game.account_prices,usd:game.account_prices_usd});
     var cms=game.custom_methods||{};
-    Object.keys(cms).forEach(function(k){var cm=cms[k];if(cm&&cm.type!=='external'&&String(cm.prices||'').trim())out.push({key:'custom_'+k,label:cm.name||('طريقة '+k),text:cm.prices});});
-    if(String(game.auto_prices||'').trim())out.push({key:'auto',label:'الشحن التلقائي',text:game.auto_prices});
+    Object.keys(cms).forEach(function(k){var cm=cms[k];if(cm&&cm.type!=='external'&&String(cm.prices||'').trim())out.push({key:'custom_'+k,label:cm.name||('طريقة '+k),text:cm.prices,usd:cm.prices_usd});});
+    if(String(game.auto_prices||'').trim())out.push({key:'auto',label:'الشحن التلقائي',text:game.auto_prices,usd:game.auto_prices_usd});
     return out;
   }
 
@@ -3465,7 +3465,7 @@
         (merchantOptions?'<div><label>نسخ أسعار من تاجر آخر</label><select id="wsCopySel"><option value="">— اختر تاجرًا —</option>'+merchantOptions+'</select></div><div style="flex:0 0 auto"><button type="button" class="btn-small" id="wsCopyBtn"><i class="fas fa-copy"></i> نسخ</button></div>':'')+
         '<div style="flex:0 0 auto"><button type="button" class="btn-small btn-red" id="wsClearAll"><i class="fas fa-eraser"></i> مسح كل الأسعار</button></div>'+
       '</div>'+
-      '<p style="color:var(--text-light);line-height:1.8;font-size:.84rem;margin:10px 0">اكتب سعر التاجر بالجنيه فقط. خانة الدولار اختيارية: إن تُركت فارغة تتحول تلقائيًا من سعر الجنيه حسب سعر الصرف الحالي. أي خانة فارغة = يبقى السعر العادي.</p>'+
+      '<p style="color:var(--text-light);line-height:1.8;font-size:.84rem;margin:10px 0">عدّل سعر التاجر بالجنيه وبالدولار بجانب بعض. لو تركت خانة الدولار فارغة يُحسب تلقائيًا من سعر الجنيه حسب سعر الصرف الحالي (يظهر الرقم الناتج داخل الخانة). أي خانتين فارغتين = يبقى السعر العادي.</p>'+
       '<input type="search" id="wsGameSearch" placeholder="ابحث عن لعبة…" style="margin-bottom:10px">'+
       '<div class="btn-group" style="margin-bottom:12px"><button type="button" class="btn-small btn-green" data-ws-save="1" style="flex:1"><i class="fas fa-save"></i> حفظ أسعار التاجر</button><span id="wsDirtyTop" style="align-self:center;font-size:.8rem;font-weight:800;color:#b45309"></span></div>'+
       '<div id="wsGames">';
@@ -3474,15 +3474,15 @@
       if(!ms.length)return;
       var inner='',n=0;
       ms.forEach(function(m){
-        var packs=parsePacks(m.text);if(!packs.length)return;
-        inner+='<div class="ws-method"><h4><i class="fas fa-bolt"></i> '+esc(m.label)+'</h4><div class="ws-cols"><span>الباقة (السعر العادي)</span><span>سعر التاجر ج.م</span><span>بالدولار</span></div>';
+        var packs=parsePacks(m.text);if(!packs.length)return;var usdMap={};parsePacks(m.usd).forEach(function(x){usdMap[x.name]=x;});
+        inner+='<div class="ws-method"><h4><i class="fas fa-bolt"></i> '+esc(m.label)+'</h4><div class="ws-cols"><span>الباقة (السعر العادي)</span><span>سعر التاجر (ج.م)</span><span>سعر التاجر ($)</span></div>';
         packs.forEach(function(p){
-          var k=packKey(p.name),o=((prices[gid]||{})[m.key]||{})[k]||{};
+          var k=packKey(p.name),o=((prices[gid]||{})[m.key]||{})[k]||{};var ub=(usdMap[p.name]&&usdMap[p.name].base!=null)?usdMap[p.name].base:(p.base!=null?r2(p.base/rate()):null);var uph=(o.e!=null&&o.u==null)?r2(o.e/rate()):(ub!=null?ub:'تلقائي');
           if(o.e!=null||o.u!=null)n++;
-          inner+='<div class="ws-row" data-g="'+esc(gid)+'" data-m="'+esc(m.key)+'" data-k="'+esc(k)+'" data-n="'+esc(p.name)+'" data-base="'+(p.base==null?'':p.base)+'">'+
-            '<div class="ws-pack"><b>'+esc(p.name)+'</b><small>العادي: '+esc(p.shown)+'</small></div>'+
+          inner+='<div class="ws-row" data-g="'+esc(gid)+'" data-m="'+esc(m.key)+'" data-k="'+esc(k)+'" data-n="'+esc(p.name)+'" data-base="'+(p.base==null?'':p.base)+'" data-ubase="'+(ub==null?'':ub)+'">'+
+            '<div class="ws-pack"><b>'+esc(p.name)+'</b><small>العادي: '+esc(p.shown)+(ub!=null?' | '+esc(ub)+' $':'')+'</small></div>'+
             '<input type="number" class="ws-e" min="0" step="0.01" inputmode="decimal" placeholder="'+(p.base==null?'':esc(p.base))+'" value="'+(o.e!=null?esc(o.e):'')+'">'+
-            '<input type="number" class="ws-u" min="0" step="0.01" inputmode="decimal" placeholder="تلقائي" value="'+(o.u!=null?esc(o.u):'')+'"></div>';
+            '<input type="number" class="ws-u" min="0" step="0.01" inputmode="decimal" placeholder="'+esc(uph)+'" value="'+(o.u!=null?esc(o.u):'')+'"></div>';
         });
         inner+='</div>';
       });
@@ -3516,7 +3516,7 @@
     rows(scopeGid).forEach(function(r){
       var base=Number(r.dataset.base);if(!Number.isFinite(base)||base<=0)return;
       var v=base*(1-pct/100);v=round?Math.max(1,Math.round(v)):r2(v);
-      r.querySelector('.ws-e').value=v;r.querySelector('.ws-u').value='';n++;
+      r.querySelector('.ws-e').value=v;var ubn=Number(r.dataset.ubase);r.querySelector('.ws-u').value=(r.dataset.ubase!==''&&Number.isFinite(ubn)&&ubn>0)?r2(ubn*(1-pct/100)):'';n++;
     });
     if(!n)alert('لا توجد أسعار قابلة للحساب.');
     markDirty();
@@ -3602,6 +3602,7 @@
       document.querySelectorAll('#wsEditor .ws-game').forEach(function(d){d.style.display=(!q||(d.dataset.name||'').indexOf(q)>-1)?'':'none';});
       return;
     }
+    if(t.classList&&t.classList.contains('ws-e')){var ur=t.parentNode.querySelector('.ws-u'),evn=Number(t.value);if(ur&&evn>0)ur.placeholder=r2(evn/rate());}
     if(t.classList&&(t.classList.contains('ws-e')||t.classList.contains('ws-u')||t.id==='wsLabel'))markDirty();
   });
   document.addEventListener('change',function(ev){if(ev.target&&ev.target.id==='wsEnabled')markDirty();});
