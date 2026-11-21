@@ -2893,6 +2893,30 @@
           <textarea id="gAutoPricesUsd" placeholder="100 جوهرة = 1.00 $ | 1101"></textarea>
         </div>
       </div>
+      <div id="gOqBuilder" style="margin-top:6px;padding:16px;border-radius:16px;background:rgba(14,165,233,.07);border:1.5px dashed #0ea5e9">
+        <h4 style="margin:0 0 6px;color:#0369a1;font-size:1.02rem"><i class="fas fa-infinity"></i> إضافة باقة «كمية مفتوحة»</h4>
+        <p style="font-size:.85rem;color:#475569;line-height:1.8;margin:0 0 12px">
+          بدل ما تكتب كل باقة لوحدها، هنا العميل <b>يكتب الكمية اللي يريدها بنفسه</b> (بين حد أدنى وحد أقصى) ويُحسب السعر تلقائياً ويُرسل للمزود برقم الخدمة. املأ الخانات ثم اضغط <b>إضافة للقائمة</b> وبعدها اضغط <b>حفظ</b> للعبة كالعادة.
+        </p>
+        <div class="row">
+          <div><label>اسم الباقة (يظهر للعميل)</label><input type="text" id="gOqName" value="كمية مفتوحة" maxlength="60"></div>
+          <div><label>رقم الخدمة (Service ID) عند المزود</label><input type="text" id="gOqService" inputmode="numeric" dir="ltr" placeholder="مثال: 1101"></div>
+        </div>
+        <div class="row">
+          <div><label>السعر بالجنيه (ج)</label><input type="number" id="gOqPrice" min="0" step="any" inputmode="decimal" dir="ltr" placeholder="مثال: 40"></div>
+          <div><label>لكل كم وحدة؟</label><input type="number" id="gOqPer" min="1" step="1" inputmode="numeric" dir="ltr" value="1000"></div>
+          <div><label>السعر بالدولار (اختياري)</label><input type="number" id="gOqPriceUsd" min="0" step="any" inputmode="decimal" dir="ltr" placeholder="يُحسب تلقائياً لو تركته فارغاً"></div>
+        </div>
+        <div class="row">
+          <div><label>أقل كمية</label><input type="number" id="gOqMin" min="1" step="1" inputmode="numeric" dir="ltr" value="100"></div>
+          <div><label>أكبر كمية</label><input type="number" id="gOqMax" min="1" step="1" inputmode="numeric" dir="ltr" value="50000"></div>
+          <div><label>الزيادة (الخطوة)</label><input type="number" id="gOqStep" min="1" step="1" inputmode="numeric" dir="ltr" value="1"></div>
+          <div><label>اسم الوحدة</label><input type="text" id="gOqUnit" maxlength="30" placeholder="مثال: عملة / جوهرة / UC"></div>
+        </div>
+        <div id="gOqPreview" style="font-size:.84rem;color:#0f766e;line-height:1.8;background:rgba(16,185,129,.08);border-radius:12px;padding:10px 12px;margin-bottom:10px">املأ الخانات لتظهر المعاينة.</div>
+        <button type="button" class="action-btn" id="gOqAddBtn" style="background:#0ea5e9"><i class="fas fa-plus"></i> إضافة للقائمة</button>
+        <small style="display:block;margin-top:8px;color:#64748b;line-height:1.7">السطر يُضاف تلقائياً في خانة الأسعار بالأعلى بالصيغة: <b dir="ltr">الاسم = السعر | Service ID | open=1&amp;min=..&amp;max=..&amp;per=..</b> ويمكنك تعديله يدوياً لاحقاً. لو أضفت باقة بنفس الاسم يتم استبدالها.</small>
+      </div>
     `;
     customMethodsSec.parentElement.insertBefore(autoGameSec, customMethodsSec);
   }
@@ -3427,6 +3451,8 @@
       var name=line.slice(0,eq).trim();if(!name)return null;
       var shown=line.slice(eq+1).split('|')[0].split('بدل')[0].trim();
       var m=toLatin(shown).match(NUM);
+      var oqRest=line.slice(eq+1).split('|').slice(2).join('|');
+      if(/(?:^|&)open=1(?:&|$)/.test(oqRest)){var oqPer=oqRest.match(/(?:^|&)per=(\d+)/);shown+=' لكل '+(oqPer?oqPer[1]:1)+' (كمية مفتوحة)';}
       return {name:name,shown:shown,base:m?Number(m[0].replace(/,/g,'')):null};
     }).filter(Boolean);
   }
@@ -3607,6 +3633,58 @@
   });
   document.addEventListener('change',function(ev){if(ev.target&&ev.target.id==='wsEnabled')markDirty();});
   showRules();
+})();
+</script>
+
+<script id="mohab-open-qty-admin">
+(function(){
+  'use strict';
+  function $(id){return document.getElementById(id);}
+  function toLatin(v){return String(v==null?'':v).replace(/[٠-٩]/g,function(d){return '٠١٢٣٤٥٦٧٨٩'.indexOf(d);}).replace(/[۰-۹]/g,function(d){return '۰۱۲۳۴۵۶۷۸۹'.indexOf(d);});}
+  function num(id){var n=Number(toLatin(($(id)||{}).value||'').replace(/,/g,'').trim());return Number.isFinite(n)?n:NaN;}
+  function clean(s){return String(s||'').replace(/[&|=\r\n]/g,' ').replace(/\s+/g,' ').trim();}
+  function rate(){var r=Number(($('walletUsdToEgp')||{}).value);return Number.isFinite(r)&&r>0?r:50;}
+  function fmt(n){return (Math.round(Number(n)*10000)/10000).toLocaleString('en-US',{maximumFractionDigits:4});}
+  function extras(){
+    var min=Math.max(1,Math.floor(num('gOqMin')||1)),max=Math.max(min,Math.floor(num('gOqMax')||min)),per=Math.max(1,num('gOqPer')||1),step=Math.max(1,Math.floor(num('gOqStep')||1)),unit=clean(($('gOqUnit')||{}).value);
+    return {min:min,max:max,per:per,step:step,unit:unit,text:'open=1&min='+min+'&max='+max+'&per='+per+(step>1?'&step='+step:'')+(unit?'&unit='+unit:'')};
+  }
+  function preview(){
+    var box=$('gOqPreview');if(!box)return;
+    var e=extras(),price=num('gOqPrice'),svc=toLatin(($('gOqService')||{}).value||'').trim();
+    if(!(price>0)){box.textContent='املأ الخانات لتظهر المعاينة.';return;}
+    var u=e.unit||'وحدة',sample=e.min,total=Math.ceil((sample/e.per)*price*100-1e-6)/100;
+    box.innerHTML='العميل سيرى: <b>'+clean(($('gOqName')||{}).value||'كمية مفتوحة')+'</b> — السعر '+fmt(price)+' ج لكل '+fmt(e.per)+' '+u+'<br>يختار كمية من <b>'+fmt(e.min)+'</b> إلى <b>'+fmt(e.max)+'</b> '+u+(e.step>1?' (بزيادة '+e.step+')':'')+'. مثال: '+fmt(sample)+' '+u+' = <b>'+fmt(Math.max(0.01,total))+' ج</b>'+(svc?'':' <span style="color:#b45309">— لا تنسَ رقم الخدمة</span>');
+  }
+  function upsert(textarea,name,line){
+    var lines=String(textarea.value||'').split(/\r?\n/).filter(function(l){return l.trim();});
+    var replaced=false;
+    lines=lines.map(function(l){var eq=l.indexOf('=');if(eq>0&&l.slice(0,eq).trim()===name){replaced=true;return line;}return l;});
+    if(!replaced)lines.push(line);
+    textarea.value=lines.join('\n');
+    return replaced;
+  }
+  function add(){
+    var name=clean(($('gOqName')||{}).value)||'كمية مفتوحة',svc=toLatin(($('gOqService')||{}).value||'').replace(/\s+/g,'');
+    var price=num('gOqPrice'),e=extras(),usd=num('gOqPriceUsd');
+    if(!/^\d+$/.test(svc)){alert('اكتب رقم الخدمة (Service ID) أرقاماً فقط، مثال: 1101');($('gOqService')||{}).focus&&$('gOqService').focus();return;}
+    if(!(price>0)){alert('اكتب السعر بالجنيه (رقم أكبر من صفر).');$('gOqPrice').focus();return;}
+    if(num('gOqMax')<num('gOqMin')){alert('أكبر كمية يجب أن تكون أكبر من أو تساوي أقل كمية.');return;}
+    var tEgp=$('gAutoPrices'),tUsd=$('gAutoPricesUsd');if(!tEgp)return;
+    var replaced=upsert(tEgp,name,name+' = '+fmt(price)+' ج | '+svc+' | '+e.text);
+    var usdNote='';
+    var hasUsdList=tUsd&&String(tUsd.value||'').trim();
+    if(tUsd&&(usd>0||hasUsdList)){
+      var uv=usd>0?usd:Math.round(price/rate()*10000)/10000;
+      upsert(tUsd,name,name+' = '+fmt(uv)+' $ | '+svc+' | '+e.text);
+      usdNote=usd>0?'':' (تم حساب سعر الدولار تلقائياً: '+fmt(uv)+' $ لكل '+fmt(e.per)+')';
+    }
+    var box=$('gOqPreview');
+    if(box)box.innerHTML='<b style="color:#047857"><i class="fas fa-check-circle"></i> '+(replaced?'تم تحديث الباقة':'تمت إضافة الباقة')+' في قائمة الأسعار بالأعلى.</b>'+usdNote+'<br>الآن اضغط زر <b>حفظ</b> الخاص باللعبة لتظهر للعملاء.';
+    try{tEgp.scrollIntoView({behavior:'smooth',block:'center'});}catch(_){}
+  }
+  document.addEventListener('click',function(ev){var b=ev.target&&ev.target.closest&&ev.target.closest('#gOqAddBtn');if(b){ev.preventDefault();add();}});
+  document.addEventListener('input',function(ev){var t=ev.target;if(t&&t.id&&/^gOq/.test(t.id))preview();});
 })();
 </script>
 
