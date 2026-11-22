@@ -1564,8 +1564,10 @@
             card.querySelector('.cm-price-fields').style.display = external ? 'none' : 'block';
         }
 
+        function packNoteKey(name) { return String(name || '').replace(/[.#$\/\[\]]/g, '_'); }
+
         function getPackageNamesForIcons() {
-            const ids = ['gIdPrices','gAccPrices','gIdPricesUsd','gAccPricesUsd'];
+            const ids = ['gIdPrices','gAccPrices','gIdPricesUsd','gAccPricesUsd','gAutoPrices','gAutoPricesUsd'];
             const names = [];
             ids.forEach(id => {
                 const el = document.getElementById(id);
@@ -1590,6 +1592,19 @@
             const holder = document.getElementById('packageIconRows');
             if (!holder) return;
             const icons = existingIcons || (editingGameId && globalGames[editingGameId] && globalGames[editingGameId].package_icons) || {};
+            const savedNotes = (editingGameId && globalGames[editingGameId] && globalGames[editingGameId].package_notes) || {};
+            const typedNotes = {};
+            if (!existingIcons) holder.querySelectorAll('.package-icon-row').forEach(r => {
+                const n = r.getAttribute('data-pack-name') || '';
+                const t = r.querySelector('.package-note-title'), x = r.querySelector('.package-note-text');
+                if (n && x) typedNotes[n] = { t: t ? t.value : '', x: x.value };
+            });
+            const noteFor = (name) => {
+                if (typedNotes[name]) return typedNotes[name];
+                const raw = savedNotes[packNoteKey(name)];
+                if (!raw) return { t: '', x: '' };
+                return typeof raw === 'string' ? { t: '', x: raw } : { t: raw.t || '', x: raw.x || '' };
+            };
             const names = getPackageNamesForIcons();
             if (!names.length) { holder.innerHTML = '<div style="color:#64748b;font-size:.85rem">لم أجد باقات مكتوبة بصيغة «اسم الباقة = السعر». اكتب الأسعار ثم اضغط تحديث القائمة.</div>'; return; }
             holder.innerHTML = names.map(name => {
@@ -1601,6 +1616,12 @@
                     <div style="font-weight:700;color:#0f172a;font-size:.88rem;overflow-wrap:anywhere">${safeName}</div>
                     <div style="display:flex;flex-direction:column;gap:6px"><input class="package-icon-url" type="url" value="${valueForInput}" placeholder="رابط صورة لهذه الباقة" style="width:100%;box-sizing:border-box"><label style="font-size:.78rem;color:#475569">أو اختر من المعرض <input class="package-icon-file" type="file" accept="image/*" style="display:block;width:100%;font-size:.76rem;margin-top:4px"></label><label style="font-size:.75rem;color:#64748b"><input type="checkbox" class="package-icon-clear"> حذف الأيقونة الخاصة والرجوع للصورة العامة</label></div>
                     <div class="package-icon-preview" style="background-color:#fff!important;background-image:linear-gradient(45deg,#e5e7eb 25%,transparent 25%),linear-gradient(-45deg,#e5e7eb 25%,transparent 25%),linear-gradient(45deg,transparent 75%,#e5e7eb 75%),linear-gradient(-45deg,transparent 75%,#e5e7eb 75%)!important;background-size:14px 14px!important;background-position:0 0,0 7px,7px -7px,-7px 0!important">${preview}</div>
+                    <div class="package-note-box" style="grid-column:1/-1;display:flex;flex-direction:column;gap:6px;margin-top:4px;padding:10px;border:1px dashed #94a3b8;border-radius:12px;background:#fff">
+                        <div style="font-weight:800;color:#0f172a;font-size:.82rem"><i class="fas fa-circle-info" style="color:#06b6d4"></i> شروط / معلومات الاستخدام لهذه الباقة (اختياري)</div>
+                        <input type="text" class="package-note-title" maxlength="40" value="${noteFor(name).t.replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;')}" placeholder="عنوان الزر (اتركه فاضي = شروط الاستخدام)" style="width:100%;box-sizing:border-box">
+                        <textarea class="package-note-text" rows="4" maxlength="2000" placeholder="اكتب كل شرط أو معلومة في سطر جديد، مثال:&#10;المدة: 30 يوم&#10;مسموح: جهاز واحد فقط&#10;ممنوع مشاركة الحساب&#10;الاسترجاع غير متاح بعد التفعيل" style="width:100%;box-sizing:border-box;resize:vertical;min-height:90px">${noteFor(name).x.replace(/&/g,'&amp;').replace(/</g,'&lt;')}</textarea>
+                        <div style="font-size:.74rem;color:#64748b;line-height:1.6">سيتم ترتيب الأسطر وتلوينها تلقائياً داخل نافذة جميلة، ويظهر زر صغير فوق هذه الباقة في الموقع. لو تركت الخانة فاضية لن يظهر أي زر.</div>
+                    </div>
                 </div>`;
             }).join('');
         }
@@ -1674,6 +1695,19 @@
                     else if (packName && !iconUrl && row.querySelector('.package-icon-clear')?.checked) delete packageIcons[packName];
                 }
 
+                // شروط/معلومات الاستخدام لكل باقة (تُحفظ بنفس طريقة الأيقونات دون المساس بباقي البيانات)
+                const packageNotes = Object.assign({}, (editingGameId && globalGames[editingGameId] && globalGames[editingGameId].package_notes) || {});
+                document.querySelectorAll('.package-icon-row').forEach(row => {
+                    const packName = row.getAttribute('data-pack-name') || '';
+                    const nText = row.querySelector('.package-note-text');
+                    if (!packName || !nText) return;
+                    const key = packNoteKey(packName);
+                    const txt = nText.value.trim();
+                    const ttl = (row.querySelector('.package-note-title')?.value || '').trim();
+                    if (txt) packageNotes[key] = { t: ttl, x: txt };
+                    else delete packageNotes[key];
+                });
+
                 const newData = {
                     name,
                     img:finalImgUrl,
@@ -1685,6 +1719,7 @@
                     external_title: kind === 'external' ? document.getElementById('gExternalTitle').value.trim() : '',
                     price_icon: finalPriceIcon,
                     package_icons: packageIcons,
+                    package_notes: packageNotes,
                     order:parseInt(document.getElementById('gOrder').value,10) || 99,
                     id_available:document.getElementById('gIdAvail').checked,
                     account_available:document.getElementById('gAccAvail').checked,
