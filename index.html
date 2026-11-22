@@ -557,6 +557,50 @@
             </div>
 
 
+            <div class="form-section" style="border-top:4px solid #06b6d4" id="introScreenSection">
+                <h3><i class="fas fa-film" style="color:#06b6d4"></i> مقدمة الموقع (شاشة جاري التحميل)</h3>
+                <p style="color:#64748b;line-height:1.8">تظهر عند فتح الموقع: مربعات صور ألعاب وتطبيقات تتحرك بشكل مائل ولوجو الموقع في المنتصف، ويتغير تصميمها تلقائياً مع الوضع الليلي أو النهاري. كل صورة تضيفها تظهر كمربع جديد ويتم ضبط حجمها تلقائياً على المربع.</p>
+                <label class="toggle-line"><input type="checkbox" id="introEnabled" checked><span>تفعيل مربعات الصور المتحركة</span></label>
+                <div class="row" style="gap:12px;align-items:end;flex-wrap:wrap;margin-top:12px">
+                    <div style="flex:1;min-width:120px"><label for="introDuration">مدة بقاء المقدمة</label><input type="number" id="introDuration" min="0" max="600" step="1" value="5"></div>
+                    <div style="flex:1;min-width:120px"><label for="introDurationUnit">الوحدة</label><select id="introDurationUnit" style="height:44px"><option value="seconds">ثوانٍ</option><option value="minutes">دقائق</option></select></div>
+                    <div style="flex:1;min-width:130px"><label for="introSpeed">سرعة حركة المربعات</label><select id="introSpeed" style="height:44px"><option value="slow">بطيئة</option><option value="normal" selected>متوسطة</option><option value="fast">سريعة</option></select></div>
+                </div>
+                <div style="font-size:.78rem;color:#64748b;margin-top:6px;line-height:1.7">المدة هي أقل وقت تظل فيه المقدمة ظاهرة (يُنصح بـ 3 إلى 8 ثوانٍ). لو الموقع جاهز قبلها ينتظر انتهاء المدة، ولو لم يكن جاهزاً تستمر حتى يجهز. الحد الأقصى 10 دقائق.</div>
+                <div class="row" style="gap:12px;align-items:end;flex-wrap:wrap;margin-top:12px">
+                    <div style="flex:1;min-width:140px"><label for="introTilt">ميل صفوف المربعات (بالدرجات)</label><input type="number" id="introTilt" min="-35" max="35" step="1" value="-12"></div>
+                    <div style="flex:1;min-width:150px"><label for="introFit">طريقة ضبط الصورة داخل المربع</label><select id="introFit" style="height:44px"><option value="auto" selected>تلقائي (الأفضل)</option><option value="cover">ملء المربع بالكامل</option><option value="contain">الصورة كاملة داخل المربع</option></select></div>
+                </div>
+                <label for="introText" style="margin-top:12px;display:block">النص أسفل المقدمة</label>
+                <input type="text" id="introText" maxlength="60" value="جاري تحميل الموقع" placeholder="جاري تحميل الموقع">
+                <div style="margin-top:12px;padding:12px;border:1px solid #cbd5e1;border-radius:12px;background:#f8fafc">
+                    <label style="font-weight:800">لوجو الموقع في منتصف المقدمة</label>
+                    <input type="url" id="introLogoUrl" placeholder="رابط صورة اللوجو (أو اختر من المعرض أسفله)" style="margin-top:6px">
+                    <input type="file" id="introLogoFile" accept="image/*" class="file-input" style="margin-top:8px">
+                    <div style="display:flex;align-items:center;gap:10px;margin-top:8px;flex-wrap:wrap">
+                        <img id="introLogoPreview" alt="" style="display:none;width:56px;height:56px;object-fit:contain;border-radius:14px;background:#0f172a;border:1px solid #cbd5e1;padding:4px">
+                        <label style="margin:0;font-size:.8rem;color:#475569"><input type="checkbox" id="introLogoClear"> حذف لوجو المقدمة والرجوع للوجو الموقع الأساسي</label>
+                    </div>
+                    <div style="font-size:.76rem;color:#64748b;margin-top:6px;line-height:1.7">لو تركته فاضياً يظهر لوجو الموقع الأساسي المضاف في إعدادات الموقع.</div>
+                </div>
+                <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px">
+                    <button type="button" class="action-btn" id="introSaveBtn" onclick="saveIntroSettings()"><i class="fas fa-save"></i> حفظ إعدادات المقدمة</button>
+                </div>
+                <div id="introSettingsMsg" role="status" style="margin-top:9px;font-size:.84rem"></div>
+
+                <h4 style="margin:20px 0 8px"><i class="fas fa-images" style="color:#06b6d4"></i> صور المربعات المتحركة <span id="introImagesCount" style="font-size:.8rem;color:#64748b"></span></h4>
+                <div class="row" style="gap:10px;align-items:stretch;flex-wrap:wrap">
+                    <div style="flex:3;min-width:200px">
+                        <input type="url" id="introImgUrl" placeholder="رابط صورة لعبة أو تطبيق أو خدمة">
+                        <input type="file" id="introImgFiles" accept="image/*" multiple class="file-input" style="margin-top:8px">
+                    </div>
+                    <div><button type="button" class="action-btn" id="introAddBtn" onclick="addIntroImages()"><i class="fas fa-plus"></i> إضافة</button></div>
+                </div>
+                <div style="font-size:.78rem;color:#64748b;margin-top:8px;line-height:1.7">تقدر ترفع أكثر من صورة مرة واحدة من المعرض. يفضل صور مربعة. كل صورة تضيفها تظهر مباشرة في المقدمة بدون الحاجة لزر الحفظ.</div>
+                <div id="introImagesMsg" role="status" style="margin-top:8px;font-size:.84rem"></div>
+                <div id="introImagesList" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(86px,1fr));gap:10px;margin-top:12px"></div>
+            </div>
+
             <div class="form-section" style="border-top:4px solid #8b5cf6">
                 <h3><i class="fas fa-bullhorn" style="color:#8b5cf6"></i> شريط آخر الأحداث</h3>
                 <p style="color:#64748b;line-height:1.8">يظهر كشريط أفقي بسيط أسفل الشريط العلوي، بدون عنوان أو صندوق إضافي. كل خبر في سطر مستقل، ويمكنك التحكم في اللون وسرعة الحركة.</p>
@@ -1564,8 +1608,10 @@
             card.querySelector('.cm-price-fields').style.display = external ? 'none' : 'block';
         }
 
+        function packNoteKey(name) { return String(name || '').replace(/[.#$\/\[\]]/g, '_'); }
+
         function getPackageNamesForIcons() {
-            const ids = ['gIdPrices','gAccPrices','gIdPricesUsd','gAccPricesUsd'];
+            const ids = ['gIdPrices','gAccPrices','gIdPricesUsd','gAccPricesUsd','gAutoPrices','gAutoPricesUsd'];
             const names = [];
             ids.forEach(id => {
                 const el = document.getElementById(id);
@@ -1590,6 +1636,19 @@
             const holder = document.getElementById('packageIconRows');
             if (!holder) return;
             const icons = existingIcons || (editingGameId && globalGames[editingGameId] && globalGames[editingGameId].package_icons) || {};
+            const savedNotes = (editingGameId && globalGames[editingGameId] && globalGames[editingGameId].package_notes) || {};
+            const typedNotes = {};
+            if (!existingIcons) holder.querySelectorAll('.package-icon-row').forEach(r => {
+                const n = r.getAttribute('data-pack-name') || '';
+                const t = r.querySelector('.package-note-title'), x = r.querySelector('.package-note-text');
+                if (n && x) typedNotes[n] = { t: t ? t.value : '', x: x.value };
+            });
+            const noteFor = (name) => {
+                if (typedNotes[name]) return typedNotes[name];
+                const raw = savedNotes[packNoteKey(name)];
+                if (!raw) return { t: '', x: '' };
+                return typeof raw === 'string' ? { t: '', x: raw } : { t: raw.t || '', x: raw.x || '' };
+            };
             const names = getPackageNamesForIcons();
             if (!names.length) { holder.innerHTML = '<div style="color:#64748b;font-size:.85rem">لم أجد باقات مكتوبة بصيغة «اسم الباقة = السعر». اكتب الأسعار ثم اضغط تحديث القائمة.</div>'; return; }
             holder.innerHTML = names.map(name => {
@@ -1601,6 +1660,12 @@
                     <div style="font-weight:700;color:#0f172a;font-size:.88rem;overflow-wrap:anywhere">${safeName}</div>
                     <div style="display:flex;flex-direction:column;gap:6px"><input class="package-icon-url" type="url" value="${valueForInput}" placeholder="رابط صورة لهذه الباقة" style="width:100%;box-sizing:border-box"><label style="font-size:.78rem;color:#475569">أو اختر من المعرض <input class="package-icon-file" type="file" accept="image/*" style="display:block;width:100%;font-size:.76rem;margin-top:4px"></label><label style="font-size:.75rem;color:#64748b"><input type="checkbox" class="package-icon-clear"> حذف الأيقونة الخاصة والرجوع للصورة العامة</label></div>
                     <div class="package-icon-preview" style="background-color:#fff!important;background-image:linear-gradient(45deg,#e5e7eb 25%,transparent 25%),linear-gradient(-45deg,#e5e7eb 25%,transparent 25%),linear-gradient(45deg,transparent 75%,#e5e7eb 75%),linear-gradient(-45deg,transparent 75%,#e5e7eb 75%)!important;background-size:14px 14px!important;background-position:0 0,0 7px,7px -7px,-7px 0!important">${preview}</div>
+                    <div class="package-note-box" style="grid-column:1/-1;display:flex;flex-direction:column;gap:6px;margin-top:4px;padding:10px;border:1px dashed #94a3b8;border-radius:12px;background:#fff">
+                        <div style="font-weight:800;color:#0f172a;font-size:.82rem"><i class="fas fa-circle-info" style="color:#06b6d4"></i> شروط / معلومات الاستخدام لهذه الباقة (اختياري)</div>
+                        <input type="text" class="package-note-title" maxlength="40" value="${noteFor(name).t.replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;')}" placeholder="عنوان الزر (اتركه فاضي = شروط الاستخدام)" style="width:100%;box-sizing:border-box">
+                        <textarea class="package-note-text" rows="4" maxlength="2000" placeholder="اكتب كل شرط أو معلومة في سطر جديد، مثال:&#10;المدة: 30 يوم&#10;مسموح: جهاز واحد فقط&#10;ممنوع مشاركة الحساب&#10;الاسترجاع غير متاح بعد التفعيل" style="width:100%;box-sizing:border-box;resize:vertical;min-height:90px">${noteFor(name).x.replace(/&/g,'&amp;').replace(/</g,'&lt;')}</textarea>
+                        <div style="font-size:.74rem;color:#64748b;line-height:1.6">سيتم ترتيب الأسطر وتلوينها تلقائياً داخل نافذة جميلة، ويظهر زر صغير فوق هذه الباقة في الموقع. لو تركت الخانة فاضية لن يظهر أي زر.</div>
+                    </div>
                 </div>`;
             }).join('');
         }
@@ -1674,6 +1739,19 @@
                     else if (packName && !iconUrl && row.querySelector('.package-icon-clear')?.checked) delete packageIcons[packName];
                 }
 
+                // شروط/معلومات الاستخدام لكل باقة (تُحفظ بنفس طريقة الأيقونات دون المساس بباقي البيانات)
+                const packageNotes = Object.assign({}, (editingGameId && globalGames[editingGameId] && globalGames[editingGameId].package_notes) || {});
+                document.querySelectorAll('.package-icon-row').forEach(row => {
+                    const packName = row.getAttribute('data-pack-name') || '';
+                    const nText = row.querySelector('.package-note-text');
+                    if (!packName || !nText) return;
+                    const key = packNoteKey(packName);
+                    const txt = nText.value.trim();
+                    const ttl = (row.querySelector('.package-note-title')?.value || '').trim();
+                    if (txt) packageNotes[key] = { t: ttl, x: txt };
+                    else delete packageNotes[key];
+                });
+
                 const newData = {
                     name,
                     img:finalImgUrl,
@@ -1685,6 +1763,7 @@
                     external_title: kind === 'external' ? document.getElementById('gExternalTitle').value.trim() : '',
                     price_icon: finalPriceIcon,
                     package_icons: packageIcons,
+                    package_notes: packageNotes,
                     order:parseInt(document.getElementById('gOrder').value,10) || 99,
                     id_available:document.getElementById('gIdAvail').checked,
                     account_available:document.getElementById('gAccAvail').checked,
@@ -3688,5 +3767,101 @@
 })();
 </script>
 
+<script id="mohab-intro-admin">
+(function(){
+  'use strict';
+  var REF='settings/introScreen',attached=false,imgRef=null,imgListener=null,setRef=null,setListener=null;
+  function $(id){return document.getElementById(id);}
+  function say(id,text,ok){var e=$(id);if(!e)return;e.textContent=text;e.style.color=ok===false?'#dc2626':'#047857';}
+  function escAttr(v){return String(v==null?'':v).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+  function fill(d){
+    d=d||{};
+    $('introEnabled').checked=d.enabled!==false;
+    var sec=Number(d.duration);if(!isFinite(sec)||sec<0)sec=5;
+    if(sec>=60&&sec%60===0){$('introDuration').value=sec/60;$('introDurationUnit').value='minutes';}else{$('introDuration').value=sec;$('introDurationUnit').value='seconds';}
+    $('introSpeed').value=['slow','normal','fast'].indexOf(d.speed)>-1?d.speed:'normal';
+    $('introFit').value=['auto','cover','contain'].indexOf(d.fit)>-1?d.fit:'auto';
+    var tilt=Number(d.tilt);$('introTilt').value=isFinite(tilt)?tilt:-12;
+    $('introText').value=d.text||'جاري تحميل الموقع';
+    var logo=String(d.logo||'');
+    $('introLogoUrl').value=(logo&&logo.length<300)?logo:'';
+    var pv=$('introLogoPreview');if(logo){pv.src=logo;pv.style.display='block';}else{pv.removeAttribute('src');pv.style.display='none';}
+  }
+  function renderImages(snap){
+    var list=$('introImagesList'),cnt=$('introImagesCount');if(!list)return;
+    var items=[];
+    if(snap&&snap.exists())snap.forEach(function(c){var v=c.val()||{};var src=typeof v==='string'?v:(v.src||'');if(src)items.push({k:c.key,src:src,t:v.t||0});});
+    items.sort(function(a,b){return a.t-b.t||(a.k<b.k?-1:1);});
+    cnt.textContent=items.length?'('+items.length+')':'';
+    if(!items.length){list.innerHTML='<div style="grid-column:1/-1;color:#94a3b8;padding:14px;text-align:center;border:1px dashed #cbd5e1;border-radius:12px">لا توجد صور مضافة بعد. أضف صوراً لتظهر كمربعات متحركة.</div>';return;}
+    list.innerHTML=items.map(function(it){
+      var key=String(it.k).replace(/[^A-Za-z0-9_-]/g,'');
+      return '<div style="position:relative;border:1px solid #cbd5e1;border-radius:14px;background:#0f172a;overflow:hidden;aspect-ratio:1/1"><img src="'+escAttr(it.src)+'" alt="" style="width:100%;height:100%;object-fit:cover;display:block" onerror="this.style.opacity=.3"><button type="button" onclick="deleteIntroImage(\''+key+'\')" title="حذف" style="position:absolute;top:4px;left:4px;width:26px;height:26px;border:0;border-radius:50%;background:#ef4444;color:#fff;cursor:pointer;font-size:.75rem"><i class="fas fa-trash"></i></button></div>';
+    }).join('');
+  }
+  function attach(){
+    if(attached||typeof db==='undefined')return;
+    attached=true;
+    try{
+      setRef=db.ref(REF);
+      setListener=setRef.on('value',function(s){fill(s.val()||{});});
+      imgRef=db.ref(REF+'/images');
+      imgListener=imgRef.on('value',renderImages);
+    }catch(e){attached=false;}
+  }
+  function detach(){
+    try{if(setRef&&setListener)setRef.off('value',setListener);if(imgRef&&imgListener)imgRef.off('value',imgListener);}catch(e){}
+    attached=false;
+  }
+  function start(){
+    try{
+      auth.onAuthStateChanged(function(u){if(u&&isAdminReady())attach();else detach();});
+    }catch(e){setTimeout(start,500);}
+  }
+  window.saveIntroSettings=async function(){
+    if(!isAdminReady())return alert('يجب تسجيل الدخول بحساب الإدارة.');
+    var btn=$('introSaveBtn');btn.disabled=true;
+    try{
+      var unit=$('introDurationUnit').value,val=Number($('introDuration').value);
+      if(!isFinite(val)||val<0)val=5;
+      var sec=Math.min(600,Math.round(unit==='minutes'?val*60:val));
+      var tilt=Number($('introTilt').value);if(!isFinite(tilt))tilt=-12;tilt=Math.max(-35,Math.min(35,tilt));
+      var value={enabled:$('introEnabled').checked,duration:sec,speed:$('introSpeed').value,fit:$('introFit').value,tilt:tilt,text:($('introText').value||'').trim().slice(0,60)||'جاري تحميل الموقع'};
+      var file=$('introLogoFile');
+      if(file.files&&file.files.length){value.logo=await compressAndEncodeImage(file.files[0],400);}
+      else if($('introLogoClear').checked){value.logo='';}
+      else{var u=($('introLogoUrl').value||'').trim();if(u)value.logo=u;}
+      await db.ref(REF).update(value);
+      file.value='';$('introLogoClear').checked=false;
+      say('introSettingsMsg','تم حفظ إعدادات المقدمة. افتح الموقع في صفحة جديدة لتشاهدها.');
+    }catch(e){say('introSettingsMsg','تعذر الحفظ: '+dbErrorMessage(e),false);}
+    finally{btn.disabled=false;}
+  };
+  window.addIntroImages=async function(){
+    if(!isAdminReady())return alert('يجب تسجيل الدخول بحساب الإدارة.');
+    var btn=$('introAddBtn'),files=Array.prototype.slice.call($('introImgFiles').files||[]),url=($('introImgUrl').value||'').trim();
+    if(!files.length&&!url)return say('introImagesMsg','اكتب رابط صورة أو اختر صوراً من المعرض.',false);
+    if(url&&!/^https?:\/\//i.test(url))return say('introImagesMsg','الرابط يجب أن يبدأ بـ https://',false);
+    btn.disabled=true;var ok=0,fail=0;
+    try{
+      var now=Date.now();
+      if(url){await db.ref(REF+'/images').push({src:url,t:now});ok++;}
+      for(var i=0;i<files.length;i++){
+        try{var data=await compressAndEncodeImage(files[i],200);await db.ref(REF+'/images').push({src:data,t:now+i+1});ok++;}
+        catch(err){fail++;}
+      }
+      $('introImgUrl').value='';$('introImgFiles').value='';
+      say('introImagesMsg','تمت إضافة '+ok+' صورة'+(fail?(' وتعذر رفع '+fail):'')+'.',fail?false:true);
+    }catch(e){say('introImagesMsg','تعذرت الإضافة: '+dbErrorMessage(e),false);}
+    finally{btn.disabled=false;}
+  };
+  window.deleteIntroImage=async function(key){
+    if(!isAdminReady())return alert('يجب تسجيل الدخول بحساب الإدارة.');
+    if(!key||!confirm('حذف هذه الصورة من المقدمة؟'))return;
+    try{await db.ref(REF+'/images/'+key).remove();}catch(e){say('introImagesMsg','تعذر الحذف: '+dbErrorMessage(e),false);}
+  };
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start);else start();
+})();
+</script>
 </body>
 </html>
