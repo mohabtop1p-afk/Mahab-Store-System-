@@ -4182,7 +4182,8 @@ var ACT={
     if(!id)return alert('رقم غير صالح.');
     try{
       var T=firebase.database.ServerValue.TIMESTAMP;
-      await db.ref('wallet_orders/'+u+'/'+k).update({providerOrderId:id,status:'processing',smmState:'pending',smmLabel:'قيد الانتظار',smmNeedsReview:null,updatedAt:T,topupUpdatedAt:T});
+      var sg=await call({action:'smm_sign',uid:u,key:k,pid:id});if(!sg||!sg.sig)throw new Error('تعذر توقيع الرقم من الـ Worker');
+      await db.ref('wallet_orders/'+u+'/'+k).update({providerOrderId:id,providerSig:sg.sig,status:'processing',smmState:'pending',smmLabel:'قيد الانتظار',smmNeedsReview:null,updatedAt:T,topupUpdatedAt:T});
       await ordLoad();alert('تم الربط ✅ — اضغط «تحديث وحفظ من المزود» لجلب الحالة الآن، وسيتتبع الموقع الطلب تلقائيًا للعميل.');
     }catch(e){alert('تعذر الربط: '+dbErr(e));}
   }
