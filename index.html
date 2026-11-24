@@ -3869,59 +3869,63 @@
 'use strict';
 var $=function(id){return document.getElementById(id);};
 var esc=function(v){return String(v==null?'':v).replace(/[&<>"']/g,function(c){return({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c];});};
-var cat={},api={},provider=[],fxRate=50,editingKey=null;
+var N=function(v){return Number(v).toLocaleString('en-US');};
+var cat={},api={},provider=[],fxRate=50,sel={},ordersData=[],ordLive={},provShown=60;
 
-/* ---- الواجهة: زر التبويب + محتواه ---- */
-var nav=document.querySelector('.admin-nav');
-if(nav){
-  var btn=document.createElement('button');btn.className='tab-btn';btn.style.color='#e11d48';
-  btn.setAttribute('onclick',"openTab('tab-smm', this); if(window.smmAdminOpen) smmAdminOpen();");
-  btn.innerHTML='<i class="fas fa-rocket"></i> تزويد السوشيال';nav.appendChild(btn);
-}
-var host=document.querySelector('.admin-container');
-if(host){
-  var tab=document.createElement('div');tab.id='tab-smm';tab.className='tab-content';
-  tab.innerHTML=
-  '<h2>تزويد السوشيال ميديا <i class="fas fa-rocket" style="color:#e11d48"></i></h2>'+
-  /* 1) الاتصال */
-  '<div class="form-section" style="border-top:4px solid #e11d48">'+
-    '<h3><i class="fas fa-plug" style="color:#e11d48"></i> الاتصال والإعدادات</h3>'+
-    '<p style="color:#64748b;line-height:1.8;font-size:.9rem">مفتاح الـ API محفوظ داخل Cloudflare Worker مستقل (<code>SMM_API_KEY</code>) ولا يظهر في الموقع نهائياً. الصق هنا رابط الـ Worker الخاص بالتزويد فقط (غير رابط الشحن التلقائي).</p>'+
-    '<label style="display:flex;gap:8px;align-items:center;margin:10px 0"><input type="checkbox" id="smmAdEnabled"> تفعيل قسم تزويد السوشيال في الموقع</label>'+
-    '<div class="form-group"><label>رابط Cloudflare Worker الخاص بالتزويد:</label><input type="url" id="smmAdWorker" dir="ltr" placeholder="https://smm-worker.xxxx.workers.dev"></div>'+
-    '<div class="form-group"><label>عنوان القسم في الموقع:</label><input type="text" id="smmAdTitle" placeholder="خدمات السوشيال ميديا"></div>'+
-    '<div class="form-group"><label>وصف قصير تحت العنوان:</label><input type="text" id="smmAdSub" placeholder="متابعين • لايكات • مشاهدات لكل المنصات"></div>'+
-    '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px"><button type="button" class="btn-small" style="background:#10b981;flex:2" onclick="smmAdSaveApi()"><i class="fas fa-save"></i> حفظ الإعدادات</button><button type="button" class="btn-small" style="background:#0284c7;flex:1" onclick="smmAdTest()"><i class="fas fa-vial"></i> اختبار الاتصال والرصيد</button></div>'+
-    '<div id="smmAdStatus" style="margin-top:12px;font-size:.88rem;line-height:1.8;overflow-wrap:anywhere"></div>'+
-  '</div>'+
-  /* 2) المنصات */
-  '<div class="form-section" style="border-top:4px solid #8b5cf6">'+
-    '<h3><i class="fas fa-share-nodes" style="color:#8b5cf6"></i> المنصات (تيك توك، فيسبوك ...)</h3>'+
-    '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px" id="smmAdPresets"></div>'+
-    '<div class="form-group"><label>اسم المنصة:</label><input type="text" id="smmPlName" placeholder="تيك توك"></div>'+
-    '<div class="form-group"><label>معرّف إنجليزي (بدون مسافات):</label><input type="text" id="smmPlKey" dir="ltr" placeholder="tiktok"></div>'+
-    '<div class="form-group"><label>الترتيب (رقم أصغر = أول):</label><input type="number" id="smmPlOrder" value="1"></div>'+
-    '<div class="form-group"><label>اللوجو (رابط صورة أو ارفع صورة):</label><input type="url" id="smmPlIcon" dir="ltr" placeholder="https://..."><input type="file" id="smmPlFile" accept="image/*" style="margin-top:8px"><img id="smmPlPrev" alt="" style="display:none;width:56px;height:56px;object-fit:contain;margin-top:8px;border-radius:12px;background:#f1f5f9"></div>'+
-    '<button type="button" class="btn-small" style="background:#8b5cf6;width:100%" onclick="smmAdSavePlatform()"><i class="fas fa-plus"></i> حفظ المنصة</button>'+
-    '<div id="smmAdPlatforms" style="margin-top:14px"></div>'+
-  '</div>'+
-  /* 3) خدمات المتجر */
-  '<div class="form-section" style="border-top:4px solid #10b981">'+
-    '<h3><i class="fas fa-store" style="color:#10b981"></i> خدمات المتجر (المعروضة للعملاء)</h3>'+
-    '<div id="smmAdSvcForm"></div>'+
-    '<div id="smmAdServices"><div class="request-empty">لا توجد خدمات بعد. أضف من قائمة المزود بالأسفل.</div></div>'+
-  '</div>'+
-  /* 4) استيراد من المزود */
-  '<div class="form-section" style="border-top:4px solid #0284c7">'+
-    '<h3><i class="fas fa-cloud-arrow-down" style="color:#0284c7"></i> خدمات المزود (alkabos)</h3>'+
-    '<button type="button" class="btn-small" style="background:#0284c7;width:100%" onclick="smmAdFetch()"><i class="fas fa-rotate"></i> جلب الخدمات من المزود</button>'+
-    '<div style="display:flex;gap:8px;margin-top:10px"><input type="text" id="smmAdSearch" placeholder="ابحث بالاسم أو الرقم أو القسم..." style="flex:1"></div>'+
-    '<div id="smmAdProvider" style="margin-top:12px"><div class="request-empty">اضغط «جلب الخدمات من المزود» أولاً.</div></div>'+
-  '</div>';
-  host.insertBefore(tab,host.firstChild);
-}
-
+var PRESETS={tiktok:['تيك توك','#fe2c55',1],facebook:['فيسبوك','#1877f2',2],instagram:['إنستجرام','#e1306c',3],youtube:['يوتيوب','#ff0033',4],telegram:['تيليجرام','#229ed9',5],twitter:['تويتر / X','#1d9bf0',6],snapchat:['سناب شات','#f7d90a',7],spotify:['سبوتيفاي','#1db954',8],whatsapp:['واتساب','#25d366',9],other:['منصات أخرى','#8b5cf6',99]};
+var GUESS=[['tiktok',/tik\s*-?tok|تيك/i],['instagram',/insta|انستا|إنستا|\big\b/i],['facebook',/face\s*book|فيس|\bfb\b/i],['youtube',/you\s*tube|يوتيوب|\byt\b/i],['telegram',/telegram|تيليجرام|تلجرام|\btg\b/i],['twitter',/twitter|تويتر|\bx\s*(\(|-|\/)|x\.com/i],['snapchat',/snap\s*chat|سناب/i],['spotify',/spotify|سبوتيفاي/i],['whatsapp',/whats\s*app|واتس/i]];
+function guess(s){var t=(s.category||'')+' '+(s.name||'');for(var i=0;i<GUESS.length;i++)if(GUESS[i][1].test(t))return GUESS[i][0];return 'other';}
 function ok(){return typeof isAdminReady==='function'&&isAdminReady();}
+function dbErr(e){return typeof dbErrorMessage==='function'?dbErrorMessage(e):(e&&e.message)||'خطأ';}
+function money(n){return (Math.round(Number(n)*100)/100).toFixed(2);}
+
+/* ---------------- الواجهة ---------------- */
+var nav=document.querySelector('.admin-nav');
+if(nav){var btn=document.createElement('button');btn.className='tab-btn';btn.style.color='#e11d48';btn.setAttribute('onclick',"openTab('tab-smm', this); if(window.smmAdminOpen) smmAdminOpen();");btn.innerHTML='<i class="fas fa-rocket"></i> تزويد السوشيال';nav.appendChild(btn);}
+var host=document.querySelector('.admin-container');
+var tab=document.createElement('div');tab.id='tab-smm';tab.className='tab-content';
+tab.innerHTML='<style>#tab-smm .sm-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}#tab-smm .sm-row>*{flex:1 1 130px;min-width:0}#tab-smm .sm-chip{display:inline-block;padding:3px 9px;border-radius:99px;font-size:.72rem;font-weight:800;background:#e2e8f0;color:#334155}#tab-smm .sm-chip.g{background:#d1fae5;color:#047857}#tab-smm .sm-chip.r{background:#fee2e2;color:#b91c1c}#tab-smm .sm-chip.b{background:#dbeafe;color:#1d4ed8}#tab-smm .sm-chip.y{background:#fef3c7;color:#b45309}#tab-smm .sm-card{background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:12px;margin-bottom:10px;line-height:1.9}#tab-smm .sm-card.added{background:#f0fdf4;border-color:#86efac}#tab-smm .sm-ic{width:46px;height:46px;border-radius:12px;object-fit:contain;background:#f1f5f9;flex:0 0 46px}#tab-smm .sm-bar{height:7px;border-radius:9px;background:#e2e8f0;overflow:hidden;margin:4px 0}#tab-smm .sm-bar i{display:block;height:100%;background:linear-gradient(90deg,#06b6d4,#10b981)}#tab-smm .sm-sub{font-size:.8rem;color:#64748b}#tab-smm .sm-sticky{position:sticky;top:0;z-index:5;background:#f8fafc;padding:8px;border-radius:12px;border:1px solid #e2e8f0;margin-bottom:10px}#tab-smm input[type=color]{height:44px;padding:2px}#tab-smm select{width:100%}</style>'+
+'<h2>تزويد السوشيال ميديا <i class="fas fa-rocket" style="color:#e11d48"></i></h2>'+
+'<div class="form-section" style="border-top:4px solid #e11d48"><h3><i class="fas fa-plug" style="color:#e11d48"></i> الاتصال والإعدادات</h3>'+
+ '<p class="sm-sub">مفتاح الـ API محفوظ كـ Secret داخل Cloudflare Worker (<code>SMM_API_KEY</code>) ولا يظهر في الموقع.</p>'+
+ '<label style="display:flex;gap:8px;align-items:center;margin:10px 0"><input type="checkbox" id="smmAdEnabled"> تفعيل قسم تزويد السوشيال في الموقع</label>'+
+ '<div class="form-group"><label>رابط Cloudflare Worker الخاص بالتزويد:</label><input type="url" id="smmAdWorker" dir="ltr" placeholder="https://smm-worker.xxxx.workers.dev"></div>'+
+ '<div class="form-group"><label>عنوان القسم في الموقع:</label><input type="text" id="smmAdTitle" placeholder="خدمات السوشيال ميديا"></div>'+
+ '<div class="form-group"><label>وصف قصير تحت العنوان:</label><input type="text" id="smmAdSub" placeholder="متابعين • لايكات • مشاهدات لكل المنصات"></div>'+
+ '<div class="form-group"><label>إعلان يظهر أعلى صفحة التزويد (اختياري):</label><input type="text" id="smmAdNotice" placeholder="مثال: عروض خاصة لفترة محدودة 🔥"></div>'+
+ '<div class="sm-row" style="margin-top:12px"><button type="button" class="btn-small" style="background:#10b981" data-act="saveApi"><i class="fas fa-save"></i> حفظ الإعدادات</button><button type="button" class="btn-small" style="background:#0284c7" data-act="test"><i class="fas fa-vial"></i> اختبار الاتصال والرصيد</button></div>'+
+ '<div id="smmAdStatus" style="margin-top:12px;font-size:.88rem;line-height:1.8;overflow-wrap:anywhere"></div></div>'+
+'<div class="form-section" style="border-top:4px solid #8b5cf6"><h3><i class="fas fa-share-nodes" style="color:#8b5cf6"></i> المنصات واللوجوهات</h3>'+
+ '<div class="sm-row" id="smmAdPresets" style="margin-bottom:10px"></div>'+
+ '<div class="sm-row"><div class="form-group"><label>اسم المنصة:</label><input type="text" id="smmPlName" placeholder="تيك توك"></div><div class="form-group"><label>معرّف إنجليزي:</label><input type="text" id="smmPlKey" dir="ltr" placeholder="tiktok"></div></div>'+
+ '<div class="sm-row"><div class="form-group"><label>لون المنصة:</label><input type="color" id="smmPlColor" value="#06b6d4"></div><div class="form-group"><label>الترتيب:</label><input type="number" id="smmPlOrder" value="1"></div></div>'+
+ '<div class="form-group"><label>وصف قصير (اختياري):</label><input type="text" id="smmPlDesc" placeholder="متابعين ولايكات ومشاهدات حقيقية"></div>'+
+ '<div class="form-group"><label>اللوجو — يدعم الصور المتحركة GIF / WebP / APNG / SVG (رابط أو من المعرض):</label><input type="url" id="smmPlIcon" dir="ltr" placeholder="https://... (يدعم أيضاً mp4 / webm كرابط)"><input type="file" id="smmPlFile" accept="image/*" style="margin-top:8px"><div class="sm-sub" style="margin-top:4px">الصور المتحركة المرفوعة من الجهاز حتى 700KB، وللأكبر استخدم رابط.</div><div style="display:flex;gap:10px;align-items:center;margin-top:8px"><img id="smmPlPrev" alt="" class="sm-ic" style="display:none"><button type="button" class="btn-small" style="background:#64748b;display:none" id="smmPlClr" data-act="clearIcon">إزالة اللوجو</button></div></div>'+
+ '<button type="button" class="btn-small" style="background:#8b5cf6;width:100%" data-act="savePlat"><i class="fas fa-plus"></i> حفظ المنصة</button><div id="smmAdPlatforms" style="margin-top:14px"></div></div>'+
+'<div class="form-section" style="border-top:4px solid #10b981"><h3><i class="fas fa-store" style="color:#10b981"></i> خدمات المتجر (المعروضة للعملاء)</h3>'+
+ '<div id="smmAdSvcForm"></div>'+
+ '<div class="sm-sticky"><div class="sm-row"><input type="text" id="smmStSearch" placeholder="بحث في خدماتك..."><select id="smmStPlat"></select></div>'+
+ '<div class="sm-row" style="margin-top:8px"><button type="button" class="btn-small" style="background:#64748b" data-act="stAll">تحديد الكل</button><select id="smmBulkPlat"></select><button type="button" class="btn-small" style="background:#0284c7" data-act="bulkMove">نقل للمنصة</button></div>'+
+ '<div class="sm-row" style="margin-top:8px"><input type="number" id="smmBulkMargin" placeholder="نسبة الربح %" value="30"><button type="button" class="btn-small" style="background:#8b5cf6" data-act="bulkMargin">تسعير بالنسبة</button><button type="button" class="btn-small" style="background:#10b981" data-act="bulkOn">تفعيل</button><button type="button" class="btn-small" style="background:#f59e0b" data-act="bulkOff">إخفاء</button><button type="button" class="btn-small" style="background:#dc2626" data-act="bulkDel">حذف</button></div></div>'+
+ '<div id="smmAdServices"></div></div>'+
+'<div class="form-section" style="border-top:4px solid #0284c7"><h3><i class="fas fa-cloud-arrow-down" style="color:#0284c7"></i> خدمات المزود (alkabos) — إضافة سريعة</h3>'+
+ '<button type="button" class="btn-small" style="background:#0284c7;width:100%" data-act="fetch"><i class="fas fa-rotate"></i> جلب الخدمات من المزود</button>'+
+ '<div class="sm-sticky" style="margin-top:10px"><div class="sm-row"><input type="text" id="smmAdSearch" placeholder="ابحث بالاسم أو الرقم أو القسم..."><select id="smmAdCat"><option value="">كل الأقسام</option></select></div>'+
+ '<div class="sm-row" style="margin-top:8px"><select id="smmAdGuess"><option value="">كل المنصات</option></select><label style="display:flex;gap:6px;align-items:center;flex:1 1 150px"><input type="checkbox" id="smmAdHide" checked> إخفاء المضاف</label></div>'+
+ '<div class="sm-row" style="margin-top:8px"><button type="button" class="btn-small" style="background:#64748b" data-act="pvAll">تحديد المعروض</button><button type="button" class="btn-small" style="background:#64748b" data-act="pvNone">إلغاء التحديد</button><span class="sm-chip b" id="smmSelCount">0 محدد</span></div>'+
+ '<div class="sm-row" style="margin-top:8px"><select id="smmAddPlat"><option value="">المنصة: تحديد تلقائي من الاسم</option></select><input type="number" id="smmAddMargin" value="30" placeholder="نسبة الربح %"><button type="button" class="btn-small" style="background:#10b981" data-act="bulkAdd"><i class="fas fa-plus"></i> إضافة المحدد للمتجر</button></div></div>'+
+ '<div id="smmAdProvider"><div class="request-empty">اضغط «جلب الخدمات من المزود» أولاً.</div></div></div>'+
+'<div class="form-section" style="border-top:4px solid #f59e0b"><h3><i class="fas fa-clipboard-list" style="color:#f59e0b"></i> تتبع طلبات التزويد</h3>'+
+ '<div class="sm-row"><button type="button" class="btn-small" style="background:#f59e0b" data-act="ordLoad"><i class="fas fa-download"></i> تحميل الطلبات</button><button type="button" class="btn-small" style="background:#0284c7" data-act="ordLive"><i class="fas fa-rotate"></i> تحديث وحفظ من المزود</button><select id="smmOrdFilter"><option value="">كل الطلبات</option><option value="active">قيد التنفيذ</option><option value="done">مكتملة</option><option value="bad">مرفوضة / ملغية</option><option value="review">تحتاج مراجعة</option></select></div>'+
+ '<div id="smmOrdStats" class="sm-sub" style="margin:10px 0"></div><div id="smmAdOrders"><div class="request-empty">اضغط «تحميل الطلبات».</div></div></div>';
+if(host)host.insertBefore(tab,host.firstChild);
+
+/* ---------------- بيانات ---------------- */
+db.ref('settings/smmApi').on('value',function(s){api=s.val()||{};if($('smmAdEnabled'))$('smmAdEnabled').checked=api.enabled===true;if($('smmAdWorker')&&document.activeElement!==$('smmAdWorker'))$('smmAdWorker').value=api.workerUrl||'';});
+db.ref('settings/smmCatalog').on('value',function(s){cat=s.val()||{};['smmAdTitle:title','smmAdSub:subtitle','smmAdNotice:notice'].forEach(function(p){var a=p.split(':'),e=$(a[0]);if(e&&document.activeElement!==e)e.value=cat[a[1]]||'';});renderPresets();renderPlatforms();renderServices();renderProvider();});
+db.ref('wallet_settings/usdToEgp').on('value',function(s){var n=Number(s.val());if(Number.isFinite(n)&&n>0)fxRate=n;});
+window.smmAdminOpen=function(){renderPresets();};
+
 function workerUrl(){return String(($('smmAdWorker')||{}).value||'').trim();}
 function say(m,good){var e=$('smmAdStatus');if(e){e.style.color=good?'#047857':(good===false?'#dc2626':'#0284c7');e.textContent=m;}}
 async function call(payload){
@@ -3932,127 +3936,250 @@ async function call(payload){
   if(!res.ok||!d||d.status!==true)throw new Error((d&&(d.message||d.error))||('HTTP '+res.status));
   return d;
 }
+function platOptions(sel,first,val){var p=cat.platforms||{};sel.innerHTML=(first?'<option value="">'+first+'</option>':'')+Object.keys(p).sort(function(a,b){return (p[a].order||99)-(p[b].order||99);}).map(function(k){return '<option value="'+esc(k)+'"'+(k===val?' selected':'')+'>'+esc(p[k].name)+'</option>';}).join('');if(val!=null&&sel.value!==val)sel.value=val;}
 
-/* ---- مستمعات البيانات ---- */
-db.ref('settings/smmApi').on('value',function(s){api=s.val()||{};if($('smmAdEnabled'))$('smmAdEnabled').checked=api.enabled===true;if($('smmAdWorker')&&document.activeElement!==$('smmAdWorker'))$('smmAdWorker').value=api.workerUrl||'';});
-db.ref('settings/smmCatalog').on('value',function(s){cat=s.val()||{};if($('smmAdTitle')&&document.activeElement!==$('smmAdTitle'))$('smmAdTitle').value=cat.title||'';if($('smmAdSub')&&document.activeElement!==$('smmAdSub'))$('smmAdSub').value=cat.subtitle||'';renderPlatforms();renderServices();});
-db.ref('wallet_settings/usdToEgp').on('value',function(s){var n=Number(s.val());if(Number.isFinite(n)&&n>0)fxRate=n;});
-window.smmAdminOpen=function(){renderPresets();};
-
-window.smmAdSaveApi=async function(){
+/* ---------------- الإعدادات ---------------- */
+async function saveApi(){
   if(!ok())return alert('يجب تسجيل الدخول بحساب الإدارة.');
   var url=workerUrl();if(url&&!/^https:\/\//i.test(url))return alert('رابط الـ Worker يجب أن يبدأ بـ https://');
   try{
     await db.ref('settings/smmApi').set({enabled:$('smmAdEnabled').checked,workerUrl:url,updatedAt:firebase.database.ServerValue.TIMESTAMP});
-    await db.ref('settings/smmCatalog').update({title:String($('smmAdTitle').value||'').trim().slice(0,60),subtitle:String($('smmAdSub').value||'').trim().slice(0,140)});
+    await db.ref('settings/smmCatalog').update({title:String($('smmAdTitle').value||'').trim().slice(0,60),subtitle:String($('smmAdSub').value||'').trim().slice(0,140),notice:String($('smmAdNotice').value||'').trim().slice(0,200)});
     say('تم حفظ الإعدادات.',true);
-  }catch(e){say('تعذر الحفظ: '+dbErrorMessage(e),false);}
-};
-window.smmAdTest=async function(){
-  if(!ok())return alert('يجب تسجيل الدخول بحساب الإدارة.');
-  say('جاري الاتصال...');
-  try{var d=await call({action:'smm_balance'});say('الاتصال ناجح ✅ — رصيدك عند المزود: '+d.balance+' '+(d.currency||''),true);}
-  catch(e){say('فشل الاتصال: '+e.message,false);}
-};
+  }catch(e){say('تعذر الحفظ: '+dbErr(e),false);}
+}
+async function testConn(){
+  if(!ok())return alert('يجب تسجيل الدخول بحساب الإدارة.');say('جاري الاتصال...');
+  try{var d=await call({action:'smm_balance'});say('الاتصال ناجح ✅ — رصيدك عند المزود: '+d.balance+' '+(d.currency||''),true);}catch(e){say('فشل الاتصال: '+e.message,false);}
+}
 
-/* ---- المنصات ---- */
-var PRESETS=[['tiktok','تيك توك'],['facebook','فيسبوك'],['instagram','إنستجرام'],['youtube','يوتيوب'],['telegram','تيليجرام'],['twitter','تويتر / X'],['snapchat','سناب شات'],['other','منصات أخرى']];
-function renderPresets(){var h=$('smmAdPresets');if(!h||h.dataset.done)return;h.dataset.done='1';h.innerHTML='<span style="font-size:.8rem;color:#64748b;align-self:center">إضافة سريعة:</span>'+PRESETS.map(function(p){return '<button type="button" class="btn-small" style="background:#64748b;padding:6px 10px;font-size:.78rem" data-pk="'+p[0]+'" data-pn="'+esc(p[1])+'">'+esc(p[1])+'</button>';}).join('');
-  h.addEventListener('click',function(e){var b=e.target.closest('[data-pk]');if(!b)return;$('smmPlKey').value=b.dataset.pk;$('smmPlName').value=b.dataset.pn;});}
-document.addEventListener('change',function(e){
-  if(e.target&&e.target.id==='smmPlFile'){var f=e.target.files&&e.target.files[0];if(!f)return;
-    compressAndEncodeImage(f,160).then(function(u){$('smmPlIcon').value=u;var p=$('smmPlPrev');p.src=u;p.style.display='block';}).catch(function(err){alert(err.message||'تعذر قراءة الصورة');});}
-});
-document.addEventListener('input',function(e){
-  if(e.target&&e.target.id==='smmPlIcon'){var p=$('smmPlPrev'),v=e.target.value.trim();if(v){p.src=v;p.style.display='block';}else p.style.display='none';}
-  if(e.target&&e.target.id==='smmAdSearch')renderProvider();
-  if(e.target&&(e.target.id==='smmSfPrice'||e.target.id==='smmSfCost'))smmCalcProfit();
-});
-window.smmAdSavePlatform=async function(){
+/* ---------------- المنصات ---------------- */
+function renderPresets(){
+  var h=$('smmAdPresets');if(!h)return;
+  h.innerHTML='<span class="sm-sub" style="flex:0 0 auto">إضافة سريعة:</span>'+Object.keys(PRESETS).map(function(k){var has=(cat.platforms||{})[k];return '<button type="button" class="btn-small" style="background:'+(has?'#94a3b8':PRESETS[k][1])+';padding:6px 10px;font-size:.78rem;flex:0 0 auto" data-act="preset" data-k="'+k+'">'+(has?'✓ ':'')+esc(PRESETS[k][0])+'</button>';}).join('');
+}
+function setIconPrev(u){var p=$('smmPlPrev'),c=$('smmPlClr');if(u&&/^(https?:|data:image\/)/i.test(u)&&!/\.(mp4|webm)(\?|$)/i.test(u)){p.src=u;p.style.display='block';c.style.display='block';}else{p.style.display='none';c.style.display=u?'block':'none';}}
+function readIcon(file){
+  return new Promise(function(res,rej){
+    if(!file||!/^image\//.test(file.type))return rej(new Error('اختر صورة (PNG / GIF / WebP / SVG).'));
+    var keepRaw=/gif|webp|svg/.test(file.type)||file.type==='image/png'||/\.apng$/i.test(file.name);
+    if(!keepRaw)return compressAndEncodeImage(file,256).then(res,rej);
+    if(file.size>700*1024){
+      if(file.type==='image/png')return compressAndEncodeImage(file,256).then(res,rej);
+      return rej(new Error('حجم الصورة ('+Math.round(file.size/1024)+'KB) أكبر من 700KB. ارفعها على موقع صور واستخدم الرابط.'));
+    }
+    var r=new FileReader();r.onload=function(){res(r.result);};r.onerror=function(){rej(new Error('تعذر قراءة الصورة'));};r.readAsDataURL(file);
+  });
+}
+async function savePlat(){
   if(!ok())return alert('يجب تسجيل الدخول بحساب الإدارة.');
   var name=String($('smmPlName').value||'').trim(),key=String($('smmPlKey').value||'').trim().toLowerCase().replace(/[^a-z0-9_-]/g,'');
   if(!name||!key)return alert('اكتب اسم المنصة والمعرّف الإنجليزي.');
   var old=(cat.platforms||{})[key]||{};
-  var data={name:name.slice(0,40),icon:String($('smmPlIcon').value||'').trim(),order:Number($('smmPlOrder').value)||1,enabled:old.enabled!==false};
-  try{await db.ref('settings/smmCatalog/platforms/'+key).set(data);['smmPlName','smmPlKey','smmPlIcon'].forEach(function(i){$(i).value='';});$('smmPlPrev').style.display='none';}
-  catch(e){alert('تعذر الحفظ: '+dbErrorMessage(e));}
-};
+  var data={name:name.slice(0,40),icon:String($('smmPlIcon').value||'').trim(),color:$('smmPlColor').value||'#06b6d4',desc:String($('smmPlDesc').value||'').trim().slice(0,120),order:Number($('smmPlOrder').value)||1,enabled:old.enabled!==false};
+  try{await db.ref('settings/smmCatalog/platforms/'+key).set(data);['smmPlName','smmPlKey','smmPlIcon','smmPlDesc'].forEach(function(i){$(i).value='';});$('smmPlFile').value='';setIconPrev('');alert('تم حفظ المنصة.');}catch(e){alert('تعذر الحفظ: '+dbErr(e));}
+}
 function renderPlatforms(){
   var box=$('smmAdPlatforms');if(!box)return;var p=cat.platforms||{},keys=Object.keys(p).sort(function(a,b){return (p[a].order||99)-(p[b].order||99);});
-  box.innerHTML=keys.length?keys.map(function(k){var x=p[k],ic=x.icon&&/^(https:|http:|data:image\/)/i.test(x.icon)?x.icon:'';
-    return '<div class="admin-card" style="display:flex;align-items:center;gap:10px;justify-content:space-between"><div style="display:flex;align-items:center;gap:10px;min-width:0">'+(ic?'<img src="'+esc(ic)+'" alt="" style="width:40px;height:40px;object-fit:contain;border-radius:10px;background:#f1f5f9">':'<i class="fas fa-share-nodes" style="font-size:22px;color:#8b5cf6"></i>')+'<div><strong>'+esc(x.name)+'</strong><div style="font-size:.74rem;color:#64748b" dir="ltr">'+esc(k)+' · ترتيب '+esc(x.order||'')+(x.enabled===false?' · مخفية':'')+'</div></div></div><div style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn-small" style="background:#0284c7;padding:7px 11px" onclick="smmAdEditPlatform(\''+esc(k)+'\')">تعديل</button><button class="btn-small" style="background:#f59e0b;padding:7px 11px" onclick="smmAdTogglePlatform(\''+esc(k)+'\')">'+(x.enabled===false?'إظهار':'إخفاء')+'</button><button class="btn-small" style="background:#dc2626;padding:7px 11px" onclick="smmAdDelPlatform(\''+esc(k)+'\')">حذف</button></div></div>';}).join(''):'<div class="request-empty">لا توجد منصات. أضف أول منصة من الأعلى.</div>';
-  var sel=$('smmSfPlatform');if(sel)fillPlatformSelect(sel,sel.value);
+  box.innerHTML=keys.length?keys.map(function(k){var x=p[k],ic=x.icon&&/^(https?:|data:image\/)/i.test(x.icon)&&!/\.(mp4|webm)(\?|$)/i.test(x.icon)?x.icon:'';
+    var n=Object.keys(cat.services||{}).filter(function(s){return cat.services[s].platform===k;}).length;
+    return '<div class="sm-card" style="border-inline-start:5px solid '+esc(x.color||'#8b5cf6')+'"><div style="display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap"><div style="display:flex;align-items:center;gap:10px;min-width:0">'+(ic?'<img class="sm-ic" src="'+esc(ic)+'" alt="">':'<span class="sm-ic" style="display:grid;place-items:center;font-size:22px;color:'+esc(x.color||'#8b5cf6')+'"><i class="fas fa-share-nodes"></i></span>')+'<div><strong>'+esc(x.name)+'</strong><div class="sm-sub" dir="ltr">'+esc(k)+' · ترتيب '+esc(x.order||'')+' · '+n+' خدمة'+(x.enabled===false?' · <span style="color:#dc2626">مخفية</span>':'')+'</div></div></div><div style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn-small" style="background:#0284c7;padding:7px 11px" data-act="editPlat" data-k="'+esc(k)+'">تعديل</button><button class="btn-small" style="background:#f59e0b;padding:7px 11px" data-act="togPlat" data-k="'+esc(k)+'">'+(x.enabled===false?'إظهار':'إخفاء')+'</button><button class="btn-small" style="background:#dc2626;padding:7px 11px" data-act="delPlat" data-k="'+esc(k)+'">حذف</button></div></div></div>';}).join(''):'<div class="request-empty">لا توجد منصات. أضف أول منصة من الأعلى.</div>';
+  ['smmStPlat','smmBulkPlat','smmAddPlat'].forEach(function(id){var e=$(id);if(!e)return;var v=e.value;platOptions(e,id==='smmStPlat'?'كل المنصات':(id==='smmAddPlat'?'المنصة: تحديد تلقائي من الاسم':'اختر منصة'),v);});
+  var sp=$('smmSfPlatform');if(sp)platOptions(sp,'— اختر المنصة —',sp.value);
+  var g=$('smmAdGuess');if(g){var gv=g.value;g.innerHTML='<option value="">كل المنصات</option>'+Object.keys(PRESETS).map(function(k){return '<option value="'+k+'">'+esc(PRESETS[k][0])+'</option>';}).join('');g.value=gv;}
 }
-window.smmAdEditPlatform=function(k){var x=(cat.platforms||{})[k];if(!x)return;$('smmPlName').value=x.name||'';$('smmPlKey').value=k;$('smmPlOrder').value=x.order||1;$('smmPlIcon').value=x.icon||'';var p=$('smmPlPrev');if(x.icon){p.src=x.icon;p.style.display='block';}else p.style.display='none';window.scrollTo({top:$('smmPlName').getBoundingClientRect().top+window.scrollY-120,behavior:'smooth'});};
-window.smmAdTogglePlatform=async function(k){if(!ok())return;var x=(cat.platforms||{})[k];if(!x)return;try{await db.ref('settings/smmCatalog/platforms/'+k+'/enabled').set(x.enabled===false);}catch(e){alert(dbErrorMessage(e));}};
-window.smmAdDelPlatform=async function(k){if(!ok())return;var n=Object.keys(cat.services||{}).filter(function(s){return cat.services[s].platform===k;}).length;if(!confirm('حذف هذه المنصة؟'+(n?'\nيوجد '+n+' خدمة مرتبطة بها وستختفي من الموقع.':'')))return;try{await db.ref('settings/smmCatalog/platforms/'+k).remove();}catch(e){alert(dbErrorMessage(e));}};
+function ensurePlatform(key,updates){
+  if((cat.platforms||{})[key]||(updates['platforms/'+key]))return;
+  var P=PRESETS[key]||PRESETS.other;updates['platforms/'+key]={name:P[0],icon:'',color:P[1],desc:'',order:P[2],enabled:true};
+}
 
-/* ---- خدمات المتجر ---- */
-function fillPlatformSelect(sel,val){var p=cat.platforms||{};sel.innerHTML='<option value="">— اختر المنصة —</option>'+Object.keys(p).map(function(k){return '<option value="'+esc(k)+'"'+(k===val?' selected':'')+'>'+esc(p[k].name)+'</option>';}).join('');}
+/* ---------------- خدمات المتجر ---------------- */
+function costOf(svc){var c=Number(svc.costUsdPer1000);if(c>0)return c;var pv=provider.find(function(p){return String(p.service)===String(svc.providerServiceId);});return pv?Number(pv.rate):0;}
 function renderServices(){
-  var box=$('smmAdServices');if(!box)return;var s=cat.services||{},p=cat.platforms||{},keys=Object.keys(s).sort(function(a,b){return String(s[a].platform).localeCompare(String(s[b].platform))||((s[a].order||999)-(s[b].order||999));});
-  box.innerHTML=keys.length?keys.map(function(k){var x=s[k],pl=(p[x.platform]||{}).name||'—';
-    return '<div class="admin-card" style="display:block"><div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start"><div style="min-width:0"><strong>'+esc(x.name)+'</strong><div style="font-size:.76rem;color:#64748b;line-height:1.8">'+esc(pl)+' · رقم الخدمة عند المزود: <span dir="ltr">'+esc(x.providerServiceId)+'</span><br>السعر لكل 1000: <b>'+esc(x.pricePer1000Egp)+' جنيه</b> · من '+esc(x.min)+' إلى '+esc(x.max)+(x.refill?' · تعويض':'')+(x.cancel?' · إلغاء':'')+(x.enabled===false?' · <span style="color:#dc2626">مخفية</span>':'')+'</div></div></div><div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px"><button class="btn-small" style="background:#0284c7;padding:7px 11px" onclick="smmAdEditService(\''+esc(k)+'\')">تعديل</button><button class="btn-small" style="background:#f59e0b;padding:7px 11px" onclick="smmAdToggleService(\''+esc(k)+'\')">'+(x.enabled===false?'تفعيل':'إخفاء')+'</button><button class="btn-small" style="background:#dc2626;padding:7px 11px" onclick="smmAdDelService(\''+esc(k)+'\')">حذف</button></div></div>';}).join(''):'<div class="request-empty">لا توجد خدمات بعد. أضف من قائمة المزود بالأسفل.</div>';
+  var box=$('smmAdServices');if(!box)return;var s=cat.services||{},p=cat.platforms||{};
+  var q=String(($('smmStSearch')||{}).value||'').toLowerCase().trim(),pf=($('smmStPlat')||{}).value||'';
+  var keys=Object.keys(s).filter(function(k){var x=s[k];return (!pf||x.platform===pf)&&(!q||[x.name,x.desc,x.providerServiceId].some(function(v){return String(v||'').toLowerCase().indexOf(q)>-1;}));}).sort(function(a,b){return String(s[a].platform).localeCompare(String(s[b].platform))||((s[a].order||999)-(s[b].order||999));});
+  box.innerHTML=(keys.length?'<div class="sm-sub" style="margin-bottom:8px">'+keys.length+' خدمة</div>':'')+(keys.length?keys.map(function(k){var x=s[k],pl=(p[x.platform]||{}).name||'—',c=costOf(x),pr=Number(x.pricePer1000Egp),profit=c>0?pr-c*fxRate:null;
+    return '<div class="sm-card"><div style="display:flex;gap:10px;align-items:flex-start"><input type="checkbox" data-sel="'+esc(k)+'" '+(sel[k]?'checked':'')+' style="margin-top:6px;flex:0 0 20px;width:20px;height:20px"><div style="min-width:0;flex:1"><strong>'+esc(x.name)+'</strong>'+(x.badge?' <span class="sm-chip y">'+esc(x.badge)+'</span>':'')+'<div class="sm-sub">'+esc(pl)+' · مزود #<span dir="ltr">'+esc(x.providerServiceId)+'</span> · '+esc(x.type||'Default')+'<br>سعر البيع/1000: <b>'+esc(x.pricePer1000Egp)+' جنيه</b>'+(profit!=null?' · ربحك: <b style="color:'+(profit>=0?'#047857':'#dc2626')+'">'+money(profit)+'</b>':'')+' · من '+esc(x.min)+' إلى '+esc(x.max)+'<br>'+(x.enabled===false?'<span class="sm-chip r">مخفية</span> ':'<span class="sm-chip g">ظاهرة</span> ')+(x.refill?'<span class="sm-chip b">تعويض</span> ':'')+(x.cancel?'<span class="sm-chip b">إلغاء</span> ':'')+'</div></div></div><div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px"><button class="btn-small" style="background:#0284c7;padding:7px 11px" data-act="editSvc" data-k="'+esc(k)+'">تعديل</button><button class="btn-small" style="background:#f59e0b;padding:7px 11px" data-act="togSvc" data-k="'+esc(k)+'">'+(x.enabled===false?'تفعيل':'إخفاء')+'</button><button class="btn-small" style="background:#dc2626;padding:7px 11px" data-act="delSvc" data-k="'+esc(k)+'">حذف</button></div></div>';}).join(''):'<div class="request-empty">لا توجد خدمات. أضف من قائمة المزود بالأسفل.</div>');
 }
 function openServiceForm(d){
-  editingKey=d.key;var f=$('smmAdSvcForm');
-  f.innerHTML='<div class="admin-card" style="display:block;border:2px solid #10b981"><h4 style="margin:0 0 10px;color:#047857">'+(d.isNew?'إضافة خدمة للمتجر':'تعديل الخدمة')+'</h4>'+
-   '<div style="font-size:.78rem;color:#64748b;line-height:1.8;margin-bottom:8px">رقم الخدمة عند المزود: <b dir="ltr">'+esc(d.providerServiceId)+'</b> · النوع: <b>'+esc(d.type||'Default')+'</b>'+(d.costUsd!=null?'<br>سعر المزود لكل 1000: <b>'+esc(d.costUsd)+' $</b> ≈ <b id="smmSfCostEgp">'+(d.costUsd*fxRate).toFixed(2)+'</b> جنيه (سعر الصرف '+fxRate+')':'')+'</div>'+
-   '<input type="hidden" id="smmSfCost" value="'+(d.costUsd!=null?(d.costUsd*fxRate):0)+'">'+
+  var f=$('smmAdSvcForm');var cost=d.cost>0?d.cost:0;
+  f.innerHTML='<div class="sm-card" style="border:2px solid #10b981"><h4 style="margin:0 0 8px;color:#047857">'+(d.isNew?'إضافة خدمة للمتجر':'تعديل الخدمة')+'</h4>'+
+   '<div class="sm-sub">مزود #<b dir="ltr">'+esc(d.providerServiceId)+'</b> · النوع: <b>'+esc(d.type||'Default')+'</b>'+(cost?'<br>تكلفتك لكل 1000: <b>'+cost+' $</b> ≈ <b>'+money(cost*fxRate)+'</b> جنيه (سعر الصرف '+fxRate+')':'')+'</div>'+
+   '<input type="hidden" id="smmSfCost" value="'+cost+'"><input type="hidden" id="smmSfType" value="'+esc(d.type||'Default')+'"><input type="hidden" id="smmSfPid" value="'+esc(d.providerServiceId)+'">'+
    '<div class="form-group"><label>المنصة:</label><select id="smmSfPlatform"></select></div>'+
    '<div class="form-group"><label>اسم الخدمة الظاهر للعميل:</label><input type="text" id="smmSfName" value="'+esc(d.name)+'"></div>'+
-   '<div class="form-group"><label>وصف/ملاحظات للعميل (اختياري):</label><input type="text" id="smmSfDesc" value="'+esc(d.desc||'')+'" placeholder="مثال: بدء خلال 0-1 ساعة • ضمان 30 يوم"></div>'+
-   '<div class="form-group"><label>سعر البيع لكل 1000 (بالجنيه):</label><input type="number" id="smmSfPrice" step="0.01" min="0" value="'+esc(d.price)+'"><div id="smmSfProfit" style="font-size:.78rem;margin-top:6px;color:#047857"></div></div>'+
-   '<div style="display:flex;gap:10px"><div class="form-group" style="flex:1"><label>أقل كمية:</label><input type="number" id="smmSfMin" value="'+esc(d.min)+'"></div><div class="form-group" style="flex:1"><label>أقصى كمية:</label><input type="number" id="smmSfMax" value="'+esc(d.max)+'"></div></div>'+
+   '<div class="form-group"><label>وصف/ملاحظات (اختياري):</label><input type="text" id="smmSfDesc" value="'+esc(d.desc||'')+'" placeholder="مثال: متابعين عالية الجودة"></div>'+
+   '<div class="form-group"><label>سعر البيع لكل 1000 (جنيه):</label><input type="number" id="smmSfPrice" step="0.01" min="0" value="'+esc(d.price)+'"><div class="sm-row" style="margin-top:6px"><input type="number" id="smmSfMargin" value="30" placeholder="ربح %"><button type="button" class="btn-small" style="background:#8b5cf6" data-act="calcMargin">احسب السعر بنسبة الربح</button></div><div id="smmSfProfit" style="font-size:.8rem;margin-top:6px"></div></div>'+
+   '<div class="sm-row"><div class="form-group"><label>أقل كمية:</label><input type="number" id="smmSfMin" value="'+esc(d.min)+'"></div><div class="form-group"><label>أقصى كمية:</label><input type="number" id="smmSfMax" value="'+esc(d.max)+'"></div></div>'+
+   '<div class="sm-row"><div class="form-group"><label>شارة (مثل: الأكثر طلباً):</label><input type="text" id="smmSfBadge" value="'+esc(d.badge||'')+'"></div><div class="form-group"><label>السرعة (مثل: بدء فوري):</label><input type="text" id="smmSfSpeed" value="'+esc(d.speed||'')+'"></div></div>'+
+   '<div class="sm-row"><div class="form-group"><label>الضمان (مثل: ضمان 30 يوم):</label><input type="text" id="smmSfGuar" value="'+esc(d.guarantee||'')+'"></div><div class="form-group"><label>كميات سريعة (مفصولة بفاصلة):</label><input type="text" id="smmSfQuick" dir="ltr" value="'+esc(d.quickQty||'')+'" placeholder="100,500,1000,5000"></div></div>'+
    '<div class="form-group"><label>الترتيب:</label><input type="number" id="smmSfOrder" value="'+esc(d.order||1)+'"></div>'+
-   '<label style="display:flex;gap:8px;align-items:center;margin:8px 0"><input type="checkbox" id="smmSfRefill" '+(d.refill?'checked':'')+'> يدعم إعادة التعويض (Refill)</label>'+
-   '<label style="display:flex;gap:8px;align-items:center;margin:8px 0"><input type="checkbox" id="smmSfCancel" '+(d.cancel?'checked':'')+'> يدعم الإلغاء (Cancel)</label>'+
-   '<label style="display:flex;gap:8px;align-items:center;margin:8px 0"><input type="checkbox" id="smmSfEnabled" '+(d.enabled!==false?'checked':'')+'> ظاهرة للعملاء</label>'+
-   '<input type="hidden" id="smmSfType" value="'+esc(d.type||'Default')+'"><input type="hidden" id="smmSfPid" value="'+esc(d.providerServiceId)+'">'+
-   '<div style="display:flex;gap:8px;margin-top:10px"><button class="btn-small" style="background:#10b981;flex:2" onclick="smmAdSaveService()"><i class="fas fa-save"></i> حفظ الخدمة</button><button class="btn-small" style="background:#64748b;flex:1" onclick="smmAdCloseForm()">إلغاء</button></div></div>';
-  fillPlatformSelect($('smmSfPlatform'),d.platform||'');smmCalcProfit();
-  f.scrollIntoView({behavior:'smooth',block:'center'});
+   '<label style="display:flex;gap:8px;align-items:center;margin:6px 0"><input type="checkbox" id="smmSfRefill" '+(d.refill?'checked':'')+'> يدعم إعادة التعويض</label>'+
+   '<label style="display:flex;gap:8px;align-items:center;margin:6px 0"><input type="checkbox" id="smmSfCancel" '+(d.cancel?'checked':'')+'> يدعم الإلغاء</label>'+
+   '<label style="display:flex;gap:8px;align-items:center;margin:6px 0"><input type="checkbox" id="smmSfEnabled" '+(d.enabled!==false?'checked':'')+'> ظاهرة للعملاء</label>'+
+   '<div class="sm-row" style="margin-top:10px"><button class="btn-small" style="background:#10b981;flex:2" data-act="saveSvc"><i class="fas fa-save"></i> حفظ الخدمة</button><button class="btn-small" style="background:#64748b" data-act="closeForm">إلغاء</button></div></div>';
+  platOptions($('smmSfPlatform'),'— اختر المنصة —',d.platform||'');calcProfit();f.scrollIntoView({behavior:'smooth',block:'center'});
 }
-function smmCalcProfit(){var c=Number(($('smmSfCost')||{}).value),p=Number(($('smmSfPrice')||{}).value),e=$('smmSfProfit');if(!e)return;if(c>0&&p>0){var pr=p-c;e.style.color=pr>=0?'#047857':'#dc2626';e.textContent='الربح لكل 1000: '+pr.toFixed(2)+' جنيه ('+(pr/c*100).toFixed(0)+'%)'+(pr<0?' ⚠️ خسارة!':'');}else e.textContent='';}
-window.smmAdCloseForm=function(){$('smmAdSvcForm').innerHTML='';editingKey=null;};
-window.smmAdSaveService=async function(){
+function calcProfit(){var c=Number(($('smmSfCost')||{}).value),p=Number(($('smmSfPrice')||{}).value),e=$('smmSfProfit');if(!e)return;if(c>0&&p>0){var pr=p-c*fxRate;e.style.color=pr>=0?'#047857':'#dc2626';e.textContent='الربح لكل 1000: '+money(pr)+' جنيه ('+(pr/(c*fxRate)*100).toFixed(0)+'%)'+(pr<0?' ⚠️ خسارة!':'');}else e.textContent='';}
+async function saveSvc(){
   if(!ok())return alert('يجب تسجيل الدخول بحساب الإدارة.');
   var pid=$('smmSfPid').value,plat=$('smmSfPlatform').value,name=String($('smmSfName').value||'').trim(),price=Number($('smmSfPrice').value),min=parseInt($('smmSfMin').value,10),max=parseInt($('smmSfMax').value,10);
   if(!plat)return alert('اختر المنصة.');if(!name)return alert('اكتب اسم الخدمة.');if(!(price>0))return alert('اكتب سعر بيع صحيح.');if(!(min>0)||!(max>=min))return alert('تأكد من أقل وأقصى كمية.');
-  var cost=Number($('smmSfCost').value);if(cost>0&&price<cost&&!confirm('سعر البيع أقل من تكلفة المزود (خسارة). هل تريد الحفظ؟'))return;
+  var cost=Number($('smmSfCost').value);if(cost>0&&price<cost*fxRate&&!confirm('سعر البيع أقل من تكلفتك (خسارة). هل تريد الحفظ؟'))return;
   var key='s'+String(pid).replace(/[^A-Za-z0-9_-]/g,'');
-  var data={providerServiceId:String(pid),platform:plat,name:name.slice(0,120),desc:String($('smmSfDesc').value||'').trim().slice(0,200),pricePer1000Egp:Math.round(price*100)/100,min:min,max:max,type:$('smmSfType').value||'Default',refill:$('smmSfRefill').checked,cancel:$('smmSfCancel').checked,enabled:$('smmSfEnabled').checked,order:Number($('smmSfOrder').value)||1,updatedAt:firebase.database.ServerValue.TIMESTAMP};
-  try{await db.ref('settings/smmCatalog/services/'+key).set(data);window.smmAdCloseForm();alert('تم حفظ الخدمة.');}catch(e){alert('تعذر الحفظ: '+dbErrorMessage(e));}
-};
-window.smmAdEditService=function(k){var x=(cat.services||{})[k];if(!x)return;var pv=provider.find(function(p){return String(p.service)===String(x.providerServiceId);});
-  openServiceForm({key:k,isNew:false,providerServiceId:x.providerServiceId,type:x.type,platform:x.platform,name:x.name,desc:x.desc,price:x.pricePer1000Egp,min:x.min,max:x.max,order:x.order,refill:x.refill,cancel:x.cancel,enabled:x.enabled,costUsd:pv?Number(pv.rate):null});};
-window.smmAdToggleService=async function(k){if(!ok())return;var x=(cat.services||{})[k];if(!x)return;try{await db.ref('settings/smmCatalog/services/'+k+'/enabled').set(x.enabled===false);}catch(e){alert(dbErrorMessage(e));}};
-window.smmAdDelService=async function(k){if(!ok())return;if(!confirm('حذف هذه الخدمة من المتجر؟'))return;try{await db.ref('settings/smmCatalog/services/'+k).remove();}catch(e){alert(dbErrorMessage(e));}};
+  var data={providerServiceId:String(pid),platform:plat,name:name.slice(0,120),desc:String($('smmSfDesc').value||'').trim().slice(0,200),pricePer1000Egp:Math.round(price*100)/100,costUsdPer1000:cost>0?cost:null,min:min,max:max,type:$('smmSfType').value||'Default',badge:String($('smmSfBadge').value||'').trim().slice(0,24),speed:String($('smmSfSpeed').value||'').trim().slice(0,40),guarantee:String($('smmSfGuar').value||'').trim().slice(0,40),quickQty:String($('smmSfQuick').value||'').replace(/[^0-9,\s]/g,'').trim(),refill:$('smmSfRefill').checked,cancel:$('smmSfCancel').checked,enabled:$('smmSfEnabled').checked,order:Number($('smmSfOrder').value)||1,updatedAt:firebase.database.ServerValue.TIMESTAMP};
+  try{await db.ref('settings/smmCatalog/services/'+key).set(data);$('smmAdSvcForm').innerHTML='';alert('تم حفظ الخدمة.');}catch(e){alert('تعذر الحفظ: '+dbErr(e));}
+}
+function editSvc(k){var x=(cat.services||{})[k];if(!x)return;openServiceForm({isNew:false,providerServiceId:x.providerServiceId,type:x.type,platform:x.platform,name:x.name,desc:x.desc,price:x.pricePer1000Egp,min:x.min,max:x.max,order:x.order,refill:x.refill,cancel:x.cancel,enabled:x.enabled,badge:x.badge,speed:x.speed,guarantee:x.guarantee,quickQty:x.quickQty,cost:costOf(x)});}
+function selKeys(){return Object.keys(sel).filter(function(k){return sel[k]&&(cat.services||{})[k];});}
+async function bulk(kind){
+  if(!ok())return alert('يجب تسجيل الدخول بحساب الإدارة.');
+  var ks=selKeys();if(!ks.length)return alert('حدد خدمة واحدة على الأقل من القائمة.');
+  var u={},skipped=0;
+  if(kind==='del'){if(!confirm('حذف '+ks.length+' خدمة من المتجر؟'))return;ks.forEach(function(k){u['services/'+k]=null;});}
+  else if(kind==='on'||kind==='off'){ks.forEach(function(k){u['services/'+k+'/enabled']=kind==='on';});}
+  else if(kind==='move'){var pl=$('smmBulkPlat').value;if(!pl)return alert('اختر المنصة من القائمة أولاً.');ks.forEach(function(k){u['services/'+k+'/platform']=pl;});}
+  else if(kind==='margin'){var m=Number($('smmBulkMargin').value);if(!(m>=0))return alert('اكتب نسبة ربح صحيحة.');ks.forEach(function(k){var c=costOf(cat.services[k]);if(c>0){u['services/'+k+'/pricePer1000Egp']=Math.ceil(c*fxRate*(1+m/100)*100)/100;u['services/'+k+'/costUsdPer1000']=c;}else skipped++;});if(!Object.keys(u).length)return alert('لا توجد تكلفة محفوظة لهذه الخدمات. اضغط «جلب الخدمات من المزود» أولاً ثم أعد المحاولة.');if(!confirm('تعديل أسعار '+(ks.length-skipped)+' خدمة بنسبة ربح '+m+'%؟'+(skipped?'\n(تم تخطي '+skipped+' بدون تكلفة)':'')))return;}
+  try{await db.ref('settings/smmCatalog').update(u);if(kind==='del')sel={};alert('تم التنفيذ.');}catch(e){alert('تعذر التنفيذ: '+dbErr(e));}
+}
 
-/* ---- خدمات المزود ---- */
-window.smmAdFetch=async function(){
+/* ---------------- خدمات المزود ---------------- */
+async function fetchProv(){
   if(!ok())return alert('يجب تسجيل الدخول بحساب الإدارة.');
   var box=$('smmAdProvider');box.innerHTML='<div class="request-empty">جاري جلب الخدمات…</div>';
-  try{var d=await call({action:'smm_services'});provider=d.services||[];renderProvider();}
+  try{var d=await call({action:'smm_services'});provider=d.services||[];provShown=60;
+    var cats={};provider.forEach(function(s){cats[s.category]=1;});var cs=$('smmAdCat'),v=cs.value;cs.innerHTML='<option value="">كل الأقسام ('+Object.keys(cats).length+')</option>'+Object.keys(cats).sort().map(function(c){return '<option>'+esc(c)+'</option>';}).join('');cs.value=v;
+    renderProvider();renderServices();}
   catch(e){box.innerHTML='<div class="request-empty" style="color:#dc2626">تعذر الجلب: '+esc(e.message)+'</div>';}
-};
+}
+var provSel={};
+function provFiltered(){
+  var q=String(($('smmAdSearch')||{}).value||'').toLowerCase().trim(),cg=($('smmAdCat')||{}).value||'',gs=($('smmAdGuess')||{}).value||'',hide=$('smmAdHide')&&$('smmAdHide').checked;
+  var added={};Object.keys(cat.services||{}).forEach(function(k){added[String(cat.services[k].providerServiceId)]=k;});
+  return provider.filter(function(s){if(hide&&added[s.service])return false;if(cg&&s.category!==cg)return false;if(gs&&guess(s)!==gs)return false;return !q||[s.service,s.name,s.category].some(function(v){return String(v||'').toLowerCase().indexOf(q)>-1;});}).map(function(s){s._added=added[s.service]||'';return s;});
+}
 function renderProvider(){
   var box=$('smmAdProvider');if(!box||!provider.length)return;
-  var q=String(($('smmAdSearch')||{}).value||'').toLowerCase().trim();
-  var list=provider.filter(function(s){return !q||[s.service,s.name,s.category].some(function(v){return String(v||'').toLowerCase().indexOf(q)>-1;});});
-  var added={};Object.keys(cat.services||{}).forEach(function(k){added[String(cat.services[k].providerServiceId)]=1;});
-  box.innerHTML='<div style="font-size:.78rem;color:#64748b;margin-bottom:8px">'+list.length+' خدمة'+(list.length>60?' (يعرض أول 60 — استخدم البحث)':'')+'</div>'+list.slice(0,60).map(function(s){
-    return '<div class="admin-card" style="display:block"><strong style="line-height:1.7">'+esc(s.name)+'</strong><div style="font-size:.76rem;color:#64748b;line-height:1.8">#'+esc(s.service)+' · '+esc(s.category)+' · '+esc(s.type)+'<br>السعر لكل 1000: <b>'+esc(s.rate)+' $</b> · من '+esc(s.min)+' إلى '+esc(s.max)+(s.refill?' · تعويض':'')+(s.cancel?' · إلغاء':'')+'</div><button class="btn-small" style="background:'+(added[s.service]?'#64748b':'#10b981')+';margin-top:8px;padding:7px 12px" onclick="smmAdAddFromProvider(\''+esc(s.service)+'\')">'+(added[s.service]?'مضافة — تعديل':'<i class="fas fa-plus"></i> إضافة للمتجر')+'</button></div>';}).join('');
+  var list=provFiltered();
+  var cnt=Object.keys(provSel).filter(function(k){return provSel[k];}).length;if($('smmSelCount'))$('smmSelCount').textContent=cnt+' محدد';
+  box.innerHTML='<div class="sm-sub" style="margin-bottom:8px">'+list.length+' خدمة'+(list.length>provShown?' (يعرض أول '+provShown+')':'')+'</div>'+list.slice(0,provShown).map(function(s){
+    var c=Number(s.rate)||0,g=guess(s);
+    return '<div class="sm-card'+(s._added?' added':'')+'"><div style="display:flex;gap:10px;align-items:flex-start"><input type="checkbox" data-pv="'+esc(s.service)+'" '+(provSel[s.service]?'checked':'')+' '+(s._added?'disabled':'')+' style="margin-top:6px;flex:0 0 20px;width:20px;height:20px"><div style="min-width:0;flex:1"><strong style="line-height:1.7">'+esc(s.name)+'</strong> '+(s._added?'<span class="sm-chip g">✓ مضافة</span>':'')+'<div class="sm-sub">#'+esc(s.service)+' · '+esc(s.category)+' · '+esc(s.type)+' · <span class="sm-chip">'+esc(PRESETS[g][0])+'</span><br>سعر المزود/1000: <b>'+esc(s.rate)+' $</b> ≈ '+money(c*fxRate)+' جنيه · من '+esc(s.min)+' إلى '+esc(s.max)+(s.refill?' · <span class="sm-chip b">تعويض</span>':'')+(s.cancel?' <span class="sm-chip b">إلغاء</span>':'')+'</div></div></div><div style="margin-top:6px"><button class="btn-small" style="background:'+(s._added?'#64748b':'#10b981')+';padding:7px 12px" data-act="pvOne" data-k="'+esc(s.service)+'">'+(s._added?'مضافة — تعديل':'<i class="fas fa-plus"></i> إضافة وتعديل')+'</button></div></div>';}).join('')+(list.length>provShown?'<button class="btn-small" style="background:#0284c7;width:100%" data-act="pvMore">عرض المزيد</button>':'');
 }
-window.smmAdAddFromProvider=function(id){
+function pvOne(id){
   var s=provider.find(function(p){return String(p.service)===String(id);});if(!s)return;
-  var key='s'+String(id).replace(/[^A-Za-z0-9_-]/g,''),ex=(cat.services||{})[key];
-  if(ex)return window.smmAdEditService(key);
-  var cost=Number(s.rate)||0;
-  openServiceForm({key:key,isNew:true,providerServiceId:s.service,type:s.type,name:s.name,price:Math.ceil(cost*fxRate*1.3*100)/100,min:Number(s.min),max:Number(s.max),refill:!!s.refill,cancel:!!s.cancel,enabled:true,order:1,costUsd:cost});
-};
+  var key='s'+String(id).replace(/[^A-Za-z0-9_-]/g,''),ex=(cat.services||{})[key];if(ex)return editSvc(key);
+  var cost=Number(s.rate)||0,g=guess(s),pl=(cat.platforms||{})[g]?g:'';
+  openServiceForm({isNew:true,providerServiceId:s.service,type:s.type,platform:pl,name:s.name,price:Math.ceil(cost*fxRate*1.3*100)/100,min:Number(s.min),max:Number(s.max),refill:!!s.refill,cancel:!!s.cancel,enabled:true,order:1,cost:cost});
+  if(!pl){alert('المنصة المقترحة «'+PRESETS[g][0]+'» غير مضافة بعد. أضفها من قسم المنصات أو اختر منصة موجودة.');}
+}
+async function bulkAdd(){
+  if(!ok())return alert('يجب تسجيل الدخول بحساب الإدارة.');
+  var ids=Object.keys(provSel).filter(function(k){return provSel[k];});if(!ids.length)return alert('حدد خدمة واحدة على الأقل من قائمة المزود.');
+  var fixed=$('smmAddPlat').value,m=Number($('smmAddMargin').value);if(!(m>=0))return alert('اكتب نسبة ربح صحيحة.');
+  if(!confirm('إضافة '+ids.length+' خدمة للمتجر بنسبة ربح '+m+'%؟\nيمكنك تعديل أي خدمة بعد الإضافة.'))return;
+  var u={},n=0,order=Object.keys(cat.services||{}).length;
+  ids.forEach(function(id){
+    var s=provider.find(function(p){return String(p.service)===String(id);});if(!s)return;
+    var key='s'+String(id).replace(/[^A-Za-z0-9_-]/g,'');if((cat.services||{})[key])return;
+    var pl=fixed||guess(s);if(!fixed)ensurePlatform(pl,u);
+    var cost=Number(s.rate)||0;
+    u['services/'+key]={providerServiceId:String(s.service),platform:pl,name:String(s.name).slice(0,120),desc:'',pricePer1000Egp:Math.ceil(cost*fxRate*(1+m/100)*100)/100,costUsdPer1000:cost>0?cost:null,min:Number(s.min),max:Number(s.max),type:s.type||'Default',badge:'',speed:'',guarantee:'',quickQty:'',refill:!!s.refill,cancel:!!s.cancel,enabled:true,order:++order,updatedAt:firebase.database.ServerValue.TIMESTAMP};n++;
+  });
+  if(!n)return alert('كل الخدمات المحددة مضافة بالفعل.');
+  try{await db.ref('settings/smmCatalog').update(u);provSel={};alert('تمت إضافة '+n+' خدمة ✅\nراجعها من «خدمات المتجر» وعدّل الأسماء والأسعار كما تريد.');}catch(e){alert('تعذر الإضافة: '+dbErr(e));}
+}
 
-/* ---- عرض طلبات التزويد داخل «طلبات الشحن والشراء» ---- */
+/* ---------------- تتبع الطلبات ---------------- */
+var STLAB={pending:'قيد المراجعة',in_progress:'جاري التنفيذ',completed:'مكتمل',partial:'مكتمل جزئياً',canceled:'ملغي'};
+function ordClass(o){if(o.smmNeedsReview&&!o.providerOrderId)return 'review';if(o.status==='rejected'||o.status==='cancelled'||o.smmState==='canceled')return 'bad';if(o.smmState==='completed'||o.smmState==='partial'||o.status==='shipped')return 'done';return 'active';}
+async function ordLoad(){
+  if(!ok())return alert('يجب تسجيل الدخول بحساب الإدارة.');
+  $('smmAdOrders').innerHTML='<div class="request-empty">جاري التحميل…</div>';
+  try{var snap=await db.ref('wallet_orders').once('value'),all=[];
+    snap.forEach(function(us){us.forEach(function(os){var o=os.val();if(o&&o.smm){o._uid=us.key;o._key=os.key;all.push(o);}});});
+    all.sort(function(a,b){return (Number(b.createdAt)||0)-(Number(a.createdAt)||0);});ordersData=all.slice(0,300);renderOrders();}
+  catch(e){$('smmAdOrders').innerHTML='<div class="request-empty" style="color:#dc2626">تعذر التحميل: '+esc(dbErr(e))+'</div>';}
+}
+function renderOrders(){
+  var f=($('smmOrdFilter')||{}).value||'';
+  var list=ordersData.filter(function(o){return !f||ordClass(o)===f;});
+  var rev=ordersData.reduce(function(a,o){return a+(o.status==='rejected'||o.status==='cancelled'?0:(Number(o.chargedAmountEgp)||0)-(Number(o.smmRefundEgp)||0));},0);
+  $('smmOrdStats').innerHTML='إجمالي '+ordersData.length+' طلب · قيد التنفيذ '+ordersData.filter(function(o){return ordClass(o)==='active';}).length+' · مكتملة '+ordersData.filter(function(o){return ordClass(o)==='done';}).length+' · مرفوضة/ملغية '+ordersData.filter(function(o){return ordClass(o)==='bad';}).length+' · تحتاج مراجعة '+ordersData.filter(function(o){return ordClass(o)==='review';}).length+' · الإيراد التقريبي '+money(rev)+' جنيه';
+  $('smmAdOrders').innerHTML=list.length?list.slice(0,100).map(function(o){
+    var q=Number(o.smmQuantity)||0,rem=o.smmRemains!=null?Number(o.smmRemains):null,done=rem!=null&&q>0?Math.max(0,q-rem):(o.smmState==='completed'?q:0),pct=q>0?Math.min(100,Math.round(done/q*100)):0,cl=ordClass(o);
+    return '<div class="sm-card"><div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap"><strong>'+esc(o.game||'')+' — '+esc(o.pack||'')+'</strong><span class="sm-chip '+(cl==='done'?'g':cl==='bad'?'r':cl==='review'?'y':'b')+'">'+esc(o.smmLabel||STLAB[o.smmState]||o.status||'')+'</span></div><div class="sm-bar"><i style="width:'+pct+'%"></i></div><div class="sm-sub">وصل '+N(done)+' من '+N(q)+' ('+pct+'%)'+(o.smmStart!=null?' · بداية العدّاد '+N(o.smmStart):'')+(rem>0?' · المتبقي '+N(rem):'')+'<br>العميل: '+esc(o.email||o.displayName||o._uid)+' · '+esc(money(o.chargedAmountEgp))+' جنيه · مزود #'+esc(o.providerOrderId||'—')+'<br>الرابط: <span dir="ltr" style="word-break:break-all">'+esc(o.smmLink||'')+'</span><br>'+esc(o.code||'')+(o.smmProviderError?'<br><span style="color:#b91c1c">خطأ المزود: '+esc(o.smmProviderError)+'</span>':'')+(Number(o.smmRefundEgp)>0?'<br>تم رد '+esc(money(o.smmRefundEgp))+' جنيه':'')+'</div></div>';}).join(''):'<div class="request-empty">لا توجد طلبات.</div>';
+}
+async function refundAdmin(uid,orderKey,amount){
+  var rk='smm_'+String(orderKey).replace(/[.#$\[\]\/]/g,'_'),rate=fxRate;
+  var tx=await db.ref('wallet_users/'+uid).transaction(function(c){
+    if(!c||typeof c!=='object')return;
+    c.autoTopupRefunds=c.autoTopupRefunds&&typeof c.autoTopupRefunds==='object'?c.autoTopupRefunds:{};
+    if(c.autoTopupRefunds[rk])return;
+    var old=Number.isFinite(Number(c.balanceEgp))?Number(c.balanceEgp):Number(c.balanceUsd||0)*rate;
+    c.balanceEgp=Math.round((old+amount)*100)/100;c.balanceUsd=Math.round((c.balanceEgp/rate)*10000)/10000;c.autoTopupRefunds[rk]=true;c.updatedAt=Date.now();return c;
+  });
+  return tx.committed;
+}
+async function ordLiveRefresh(){
+  if(!ok())return alert('يجب تسجيل الدخول بحساب الإدارة.');
+  var act=ordersData.filter(function(o){return o.providerOrderId&&!o.smmFinal;}).slice(0,50);if(!act.length)return alert('لا توجد طلبات قيد التنفيذ للتحديث.');
+  $('smmOrdStats').textContent='جاري التحديث من المزود…';
+  try{
+    var d=await call({action:'smm_status',items:act.map(function(o){return {uid:o._uid,key:o._key};})}),T=firebase.database.ServerValue.TIMESTAMP,n=0;
+    for(var i=0;i<act.length;i++){
+      var o=act[i],r=d.results[o._key];if(!r||r.error||!r.state)continue;
+      var qty=Number(o.smmQuantity)||0,rem=r.remains!==''&&r.remains!=null?Number(r.remains):null,st=r.start_count!==''&&r.start_count!=null?Number(r.start_count):null,charged=Number(o.chargedAmountEgp)||0;
+      var upd={smmState:r.state,smmLabel:({pending:'قيد المراجعة',in_progress:'جاري التنفيذ',completed:'تم التنفيذ بالكامل',partial:'اكتمل جزئياً — تم رد قيمة المتبقي',canceled:'ملغي — تم رد المبلغ'})[r.state]||'',smmProviderStatus:String(r.raw||''),smmStart:Number.isFinite(st)?st:null,smmRemains:Number.isFinite(rem)?rem:null,updatedAt:T};
+      if(r.state==='completed'){upd.status='shipped';upd.smmRemains=0;upd.smmFinal=true;upd.shippedAt=T;}
+      else if(r.state==='partial'){var rm=Number.isFinite(rem)&&qty>0?Math.min(rem,qty):0,am=Math.round(charged*(rm/qty)*100)/100;if(am>0){try{await refundAdmin(o._uid,o._key,am);}catch(e){continue;}}upd.status='shipped';upd.smmFinal=true;upd.shippedAt=T;upd.smmRefundEgp=am;upd.refundIssued=true;}
+      else if(r.state==='canceled'){try{await refundAdmin(o._uid,o._key,charged);}catch(e){continue;}upd.status='cancelled';upd.smmFinal=true;upd.smmRefundEgp=charged;upd.refundIssued=true;}
+      try{await db.ref('wallet_orders/'+o._uid+'/'+o._key).update(upd);n++;}catch(e){}
+    }
+    await ordLoad();alert('تم تحديث '+n+' طلب من المزود.');
+  }catch(e){$('smmOrdStats').textContent='تعذر التحديث: '+e.message;}
+}
+
+/* ---------------- الأحداث ---------------- */
+var ACT={
+  saveApi:saveApi,test:testConn,savePlat:savePlat,fetch:fetchProv,saveSvc:saveSvc,ordLoad:ordLoad,ordLive:ordLiveRefresh,bulkAdd:bulkAdd,
+  clearIcon:function(){$('smmPlIcon').value='';$('smmPlFile').value='';setIconPrev('');},
+  preset:function(b){var k=b.dataset.k,P=PRESETS[k];$('smmPlKey').value=k;$('smmPlName').value=P[0];$('smmPlColor').value=P[1];$('smmPlOrder').value=P[2];},
+  editPlat:function(b){var k=b.dataset.k,x=(cat.platforms||{})[k];if(!x)return;$('smmPlName').value=x.name||'';$('smmPlKey').value=k;$('smmPlOrder').value=x.order||1;$('smmPlColor').value=x.color||'#06b6d4';$('smmPlDesc').value=x.desc||'';$('smmPlIcon').value=x.icon||'';setIconPrev(x.icon||'');$('smmPlName').scrollIntoView({behavior:'smooth',block:'center'});},
+  togPlat:async function(b){if(!ok())return;var x=(cat.platforms||{})[b.dataset.k];if(!x)return;try{await db.ref('settings/smmCatalog/platforms/'+b.dataset.k+'/enabled').set(x.enabled===false);}catch(e){alert(dbErr(e));}},
+  delPlat:async function(b){if(!ok())return;var k=b.dataset.k,n=Object.keys(cat.services||{}).filter(function(s){return cat.services[s].platform===k;}).length;if(!confirm('حذف هذه المنصة؟'+(n?'\nيوجد '+n+' خدمة مرتبطة بها وستختفي من الموقع.':'')))return;try{await db.ref('settings/smmCatalog/platforms/'+k).remove();}catch(e){alert(dbErr(e));}},
+  editSvc:function(b){editSvc(b.dataset.k);},
+  togSvc:async function(b){if(!ok())return;var x=(cat.services||{})[b.dataset.k];if(!x)return;try{await db.ref('settings/smmCatalog/services/'+b.dataset.k+'/enabled').set(x.enabled===false);}catch(e){alert(dbErr(e));}},
+  delSvc:async function(b){if(!ok())return;if(!confirm('حذف هذه الخدمة من المتجر؟'))return;try{await db.ref('settings/smmCatalog/services/'+b.dataset.k).remove();}catch(e){alert(dbErr(e));}},
+  closeForm:function(){$('smmAdSvcForm').innerHTML='';},
+  calcMargin:function(){var c=Number($('smmSfCost').value),m=Number($('smmSfMargin').value);if(!(c>0))return alert('لا توجد تكلفة محفوظة. اضغط «جلب الخدمات من المزود» أولاً.');$('smmSfPrice').value=Math.ceil(c*fxRate*(1+m/100)*100)/100;calcProfit();},
+  stAll:function(){var ks=Object.keys(cat.services||{});var all=ks.every(function(k){return sel[k];});ks.forEach(function(k){sel[k]=!all;});renderServices();},
+  bulkMove:function(){bulk('move');},bulkMargin:function(){bulk('margin');},bulkOn:function(){bulk('on');},bulkOff:function(){bulk('off');},bulkDel:function(){bulk('del');},
+  pvOne:function(b){pvOne(b.dataset.k);},
+  pvMore:function(){provShown+=60;renderProvider();},
+  pvAll:function(){provFiltered().slice(0,provShown).forEach(function(s){if(!s._added)provSel[s.service]=true;});renderProvider();},
+  pvNone:function(){provSel={};renderProvider();}
+};
+tab.addEventListener('click',function(e){var b=e.target.closest('[data-act]');if(!b||!ACT[b.dataset.act])return;ACT[b.dataset.act](b);});
+tab.addEventListener('change',function(e){
+  var t=e.target;
+  if(t.id==='smmPlFile'){var f=t.files&&t.files[0];if(!f)return;readIcon(f).then(function(u){$('smmPlIcon').value=u;setIconPrev(u);}).catch(function(err){t.value='';alert(err.message||'تعذر قراءة الصورة');});return;}
+  if(t.dataset&&t.dataset.sel){sel[t.dataset.sel]=t.checked;return;}
+  if(t.dataset&&t.dataset.pv){provSel[t.dataset.pv]=t.checked;var c=Object.keys(provSel).filter(function(k){return provSel[k];}).length;$('smmSelCount').textContent=c+' محدد';return;}
+  if(t.id==='smmAdCat'||t.id==='smmAdGuess'||t.id==='smmAdHide'){provShown=60;renderProvider();}
+  if(t.id==='smmStPlat')renderServices();
+  if(t.id==='smmOrdFilter')renderOrders();
+});
+tab.addEventListener('input',function(e){
+  var t=e.target;
+  if(t.id==='smmPlIcon')setIconPrev(t.value.trim());
+  if(t.id==='smmAdSearch'){provShown=60;renderProvider();}
+  if(t.id==='smmStSearch')renderServices();
+  if(t.id==='smmSfPrice')calcProfit();
+});
+
+/* ---------------- عرض بيانات التزويد داخل «طلبات الشحن والشراء» ---------------- */
 window.smmAdminInfo=function(o){
   if(!o||!o.smm)return '';
   var E=function(v){return typeof walletAdminEscape==='function'?walletAdminEscape(v):esc(v);};
@@ -4061,6 +4188,7 @@ window.smmAdminInfo=function(o){
    ' | <strong>رقم الطلب عند المزود:</strong> '+E(o.providerOrderId||'— (لم يُرسل)')+'<br><strong>الحالة:</strong> '+E(o.smmLabel||o.smmState||'')+
    (o.smmStart!=null?' | <strong>بداية العدّاد:</strong> '+E(o.smmStart):'')+(o.smmRemains!=null?' | <strong>المتبقي:</strong> '+E(o.smmRemains):'')+
    (Number(o.smmRefundEgp)>0?'<br><strong>تم رد للعميل:</strong> '+E(o.smmRefundEgp)+' جنيه':'')+
+   (o.smmProviderError?'<br><span style="color:#b91c1c"><strong>خطأ المزود:</strong> '+E(o.smmProviderError)+'</span>':'')+
    (o.smmNeedsReview&&!o.providerOrderId?'<br><span style="color:#dc2626"><strong>⚠️ يحتاج مراجعة:</strong> لم يصل تأكيد الإرسال للمزود. راجع لوحة المزود قبل أي رد/إعادة.</span>':'')+'</div>';
 };
 })();
