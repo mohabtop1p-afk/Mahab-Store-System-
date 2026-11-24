@@ -4092,8 +4092,8 @@ async function bulkAdd(){
 }
 
 /* ---------------- تتبع الطلبات ---------------- */
-var STLAB={pending:'قيد الانتظار',in_progress:'جاري التنفيذ',completed:'مكتمل',partial:'مكتمل جزئياً',canceled:'ملغي'};
-function ordClass(o){if(o.smmNeedsReview&&!o.providerOrderId)return 'review';if(o.status==='rejected'||o.status==='cancelled'||o.smmState==='canceled')return 'bad';if(o.smmState==='completed'||o.smmState==='partial'||o.status==='shipped')return 'done';return 'active';}
+var STLAB={pending:'قيد الانتظار',processing:'قيد المعالجة',in_progress:'قيد التنفيذ',completed:'مكتمل',partial:'مكتمل جزئياً',canceled:'ملغي'};
+function ordClass(o){if(!o.providerOrderId&&o.status!=='rejected'&&o.status!=='cancelled'&&!o.smmFinal)return 'review';if(o.status==='rejected'||o.status==='cancelled'||o.smmState==='canceled')return 'bad';if(o.smmState==='completed'||o.smmState==='partial'||o.status==='shipped')return 'done';return 'active';}
 async function ordLoad(){
   if(!ok())return alert('يجب تسجيل الدخول بحساب الإدارة.');
   $('smmAdOrders').innerHTML='<div class="request-empty">جاري التحميل…</div>';
@@ -4109,7 +4109,7 @@ function renderOrders(){
   $('smmOrdStats').innerHTML='إجمالي '+ordersData.length+' طلب · قيد التنفيذ '+ordersData.filter(function(o){return ordClass(o)==='active';}).length+' · مكتملة '+ordersData.filter(function(o){return ordClass(o)==='done';}).length+' · مرفوضة/ملغية '+ordersData.filter(function(o){return ordClass(o)==='bad';}).length+' · تحتاج مراجعة '+ordersData.filter(function(o){return ordClass(o)==='review';}).length+' · الإيراد التقريبي '+money(rev)+' جنيه';
   $('smmAdOrders').innerHTML=list.length?list.slice(0,100).map(function(o){
     var q=Number(o.smmQuantity)||0,rem=o.smmRemains!=null?Number(o.smmRemains):null,done=rem!=null&&q>0?Math.max(0,q-rem):(o.smmState==='completed'?q:0),pct=q>0?Math.min(100,Math.round(done/q*100)):0,cl=ordClass(o);
-    return '<div class="sm-card"><div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap"><strong>'+esc(o.game||'')+' — '+esc(o.pack||'')+'</strong><span class="sm-chip '+(cl==='done'?'g':cl==='bad'?'r':cl==='review'?'y':'b')+'">'+esc(o.smmLabel||STLAB[o.smmState]||o.status||'')+'</span></div><div class="sm-bar"><i style="width:'+pct+'%"></i></div><div class="sm-sub">وصل '+N(done)+' من '+N(q)+' ('+pct+'%)'+(o.smmStart!=null?' · بداية العدّاد '+N(o.smmStart):'')+(rem>0?' · المتبقي '+N(rem):'')+'<br>العميل: '+esc(o.email||o.displayName||o._uid)+' · '+esc(money(o.chargedAmountEgp))+' جنيه · مزود #'+esc(o.providerOrderId||'—')+'<br>الرابط: <span dir="ltr" style="word-break:break-all">'+esc(o.smmLink||'')+'</span><br>'+esc(o.code||'')+(o.smmProviderStatus?'<br>حالة المزود: '+esc(o.smmProviderStatus):'')+(Number.isFinite(Number(o.smmProviderCharge))?'<br>تكلفة المزود: '+esc(money(o.smmProviderCharge))+' '+esc(o.smmProviderCurrency||''):'')+(o.smmProviderError?'<br><span style="color:#b91c1c">خطأ المزود: '+esc(o.smmProviderError)+'</span>':'')+(Number(o.smmRefundEgp)>0?'<br>تم رد '+esc(money(o.smmRefundEgp))+' جنيه':'')+(o.smmRefundPending?'<br><span style="color:#b45309">استرداد المتبقي يحتاج مراجعة</span>':'')+'</div></div>';}).join(''):'<div class="request-empty">لا توجد طلبات.</div>';
+    return '<div class="sm-card"><div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap"><strong>'+esc(o.game||'')+' — '+esc(o.pack||'')+'</strong><span class="sm-chip '+(cl==='done'?'g':cl==='bad'?'r':cl==='review'?'y':'b')+'">'+esc(!o.providerOrderId&&o.status!=='rejected'&&o.status!=='cancelled'&&!o.smmFinal?'بدون رقم مزود — يحتاج ربط':(o.smmLabel||STLAB[o.smmState]||o.status||''))+'</span></div><div class="sm-bar"><i style="width:'+pct+'%"></i></div><div class="sm-sub">وصل '+N(done)+' من '+N(q)+' ('+pct+'%)'+(o.smmStart!=null?' · بداية العدّاد '+N(o.smmStart):'')+(rem>0?' · المتبقي '+N(rem):'')+'<br>العميل: '+esc(o.email||o.displayName||o._uid)+' · '+esc(money(o.chargedAmountEgp))+' جنيه · مزود #'+esc(o.providerOrderId||'—')+'<br>الرابط: <span dir="ltr" style="word-break:break-all">'+esc(o.smmLink||'')+'</span><br>'+esc(o.code||'')+(o.smmProviderStatus?'<br>حالة المزود: '+esc(o.smmProviderStatus):'')+(Number.isFinite(Number(o.smmProviderCharge))?'<br>تكلفة المزود: '+esc(money(o.smmProviderCharge))+' '+esc(o.smmProviderCurrency||''):'')+(o.smmProviderError?'<br><span style="color:#b91c1c">خطأ المزود: '+esc(o.smmProviderError)+'</span>':'')+(Number(o.smmRefundEgp)>0?'<br>تم رد '+esc(money(o.smmRefundEgp))+' جنيه':'')+(o.smmRefundPending?'<br><span style="color:#b45309">استرداد المتبقي يحتاج مراجعة</span>':'')+'</div>'+(!o.providerOrderId&&o.status!=='rejected'&&o.status!=='cancelled'&&!o.smmFinal?'<div style="margin-top:8px"><button type="button" class="btn-small" style="background:#e11d48" data-act="linkPid" data-u="'+esc(o._uid)+'" data-k="'+esc(o._key)+'"><i class="fas fa-link"></i> ربط برقم الطلب عند المزود</button></div>':'')+'</div>';}).join(''):'<div class="request-empty">لا توجد طلبات.</div>';
 }
 async function refundAdmin(uid,orderKey,amount){
   var rk='smm_'+String(orderKey).replace(/[.#$\[\]\/]/g,'_'),rate=fxRate;
@@ -4131,7 +4131,7 @@ async function ordLiveRefresh(){
     for(var i=0;i<act.length;i++){
       var o=act[i],r=d.results[o._key];if(!r||r.error||!r.state)continue;
       var qty=Number(o.smmQuantity)||0,rem=r.remains!==''&&r.remains!=null?Number(r.remains):null,st=r.start_count!==''&&r.start_count!=null?Number(r.start_count):null,charged=Number(o.chargedAmountEgp)||0;
-      var providerCharge=Number(r.charge),upd={smmState:r.state,smmLabel:({pending:'قيد الانتظار',in_progress:'جاري التنفيذ',completed:'مكتمل',partial:'اكتمل جزئياً — تم رد قيمة المتبقي',canceled:'ملغي — تم رد قيمة المتبقي'})[r.state]||'',smmProviderStatus:String(r.raw||''),smmStart:Number.isFinite(st)?st:null,smmRemains:Number.isFinite(rem)?rem:null,smmProviderCharge:Number.isFinite(providerCharge)?providerCharge:null,smmProviderCurrency:String(r.currency||''),updatedAt:T};
+      var providerCharge=Number(r.charge),upd={smmState:r.state,smmLabel:({pending:'قيد الانتظار',processing:'قيد المعالجة',in_progress:'قيد التنفيذ',completed:'مكتمل',partial:'اكتمل جزئياً — تم رد قيمة المتبقي',canceled:'ملغي — تم رد قيمة المتبقي'})[r.state]||'',smmProviderStatus:String(r.raw||''),smmStart:Number.isFinite(st)?st:null,smmRemains:Number.isFinite(rem)?rem:null,smmProviderCharge:Number.isFinite(providerCharge)?providerCharge:null,smmProviderCurrency:String(r.currency||''),updatedAt:T};
       if(r.state==='completed'){upd.status='shipped';upd.smmRemains=0;upd.smmFinal=true;upd.shippedAt=T;}
       else if(r.state==='partial'){
         var rm=Number.isFinite(rem)&&qty>0?Math.max(0,Math.min(rem,qty)):null;
@@ -4173,7 +4173,19 @@ var ACT={
   pvOne:function(b){pvOne(b.dataset.k);},
   pvMore:function(){provShown+=60;renderProvider();},
   pvAll:function(){provFiltered().slice(0,provShown).forEach(function(s){if(!s._added)provSel[s.service]=true;});renderProvider();},
-  pvNone:function(){provSel={};renderProvider();}
+  pvNone:function(){provSel={};renderProvider();},
+  linkPid:async function(b){
+    if(!ok())return alert('يجب تسجيل الدخول بحساب الإدارة.');
+    var u=b.dataset.u,k=b.dataset.k;
+    var id=prompt('اكتب رقم الطلب عند المزود (مثال: 233487) لربطه بهذا الطلب وبدء التتبع التلقائي:');
+    if(id===null)return;id=String(id).replace(/[^0-9]/g,'');
+    if(!id)return alert('رقم غير صالح.');
+    try{
+      var T=firebase.database.ServerValue.TIMESTAMP;
+      await db.ref('wallet_orders/'+u+'/'+k).update({providerOrderId:id,status:'processing',smmState:'pending',smmLabel:'قيد الانتظار',smmNeedsReview:null,updatedAt:T,topupUpdatedAt:T});
+      await ordLoad();alert('تم الربط ✅ — اضغط «تحديث وحفظ من المزود» لجلب الحالة الآن، وسيتتبع الموقع الطلب تلقائيًا للعميل.');
+    }catch(e){alert('تعذر الربط: '+dbErr(e));}
+  }
 };
 tab.addEventListener('click',function(e){var b=e.target.closest('[data-act]');if(!b||!ACT[b.dataset.act])return;ACT[b.dataset.act](b);});
 tab.addEventListener('change',function(e){
