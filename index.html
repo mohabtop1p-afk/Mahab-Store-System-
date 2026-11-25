@@ -2410,8 +2410,8 @@
             try {
                 const s=await db.ref('wallet_users').once('value');
                 walletUsersAdminCache=s.val()||{};
-                const bansSnap=await db.ref('wallet_bans').once('value');const bans=bansSnap.val()||{};Object.keys(walletUsersAdminCache).forEach(uid=>{walletUsersAdminCache[uid].banned=!!(bans[uid]&&bans[uid].banned);});
-                const visualSnap=await db.ref('wallet_settings').once('value');const visuals=visualSnap.val()||{};const banInput=document.getElementById('walletBanImageUrl'),avatarInput=document.getElementById('walletProfileAvatarUrl');if(banInput)banInput.value=visuals.banImageUrl||'';if(avatarInput)avatarInput.value=visuals.profileAvatarUrl||'';
+                let bans={};try{const bansSnap=await db.ref('wallet_bans').once('value');bans=bansSnap.val()||{};}catch(_){bans={};}Object.keys(walletUsersAdminCache).forEach(uid=>{if(walletUsersAdminCache[uid]&&typeof walletUsersAdminCache[uid]==='object')walletUsersAdminCache[uid].banned=!!(bans[uid]&&bans[uid].banned);});
+                let visuals={};try{const visualSnap=await db.ref('wallet_settings').once('value');visuals=visualSnap.val()||{};}catch(_){visuals={};}const banInput=document.getElementById('walletBanImageUrl'),avatarInput=document.getElementById('walletProfileAvatarUrl');if(banInput)banInput.value=visuals.banImageUrl||'';if(avatarInput)avatarInput.value=visuals.profileAvatarUrl||'';
                 renderWalletUsers();
             } catch(e) {
                 if(box) box.innerHTML='<div class="request-empty" style="color:#dc2626">تعذر تحميل المستخدمين: '+walletAdminEscape(dbErrorMessage(e))+'<br>تأكد أن حساب الإدارة هو '+walletAdminEscape(AUTHORIZED_EMAIL)+' وأن قواعد Realtime Database تسمح له بقراءة wallet_users، مع السماح لكل مستخدم بقراءة سجله فقط.</div>';
@@ -2442,6 +2442,7 @@
                         <div class="wallet-admin-meta"><i class="${providerIcon}"></i> طريقة التسجيل: <b>${provider}</b></div>
                         <div class="wallet-admin-meta">كود المستخدم: <b>${walletAdminEscape(u.userCode||uid.slice(0,8).toUpperCase())}</b></div>
                         ${u.banned?'<div style="color:#dc2626;font-weight:800;margin-top:6px">هذا الحساب محظور</div>':''}
+                         <div class="wallet-admin-meta"><i class="fas fa-shield-halved"></i> رمز الأمان: <b style="color:${u.securityCode&&u.securityCode.enabled?'#059669':'#64748b'}">${u.securityCode&&u.securityCode.enabled?'مفعّل':'غير مفعّل'}</b></div>
                         <div class="wallet-admin-meta" style="direction:ltr;text-align:right;overflow-wrap:anywhere">UID: ${walletAdminEscape(uid)}</div>
                         ${u.email?`<div class="wallet-admin-meta">البريد المرتبط: ${walletAdminEscape(u.email)}</div>`:''}
                       </div>
@@ -2451,9 +2452,37 @@
                       <div><label>المبلغ بالدولار</label><input type="number" min="0.01" step="0.01" id="walletAdjAmt_${uid}" placeholder="مثال: 5.00"></div>
                       <div><label>ملاحظة العملية</label><input id="walletAdjNote_${uid}" placeholder="سبب الإضافة أو الخصم"></div>
                     </div>
-                    <div class="btn-group"><button class="btn-small btn-green" onclick="adjustWalletUser('${uid}',1)">إضافة رصيد</button><button class="btn-small btn-red" onclick="adjustWalletUser('${uid}',-1)">خصم رصيد</button><button class="btn-small ${u.banned?'btn-green':'btn-red'}" onclick="setWalletUserBan('${uid}',${u.banned?'false':'true'})">${u.banned?'إلغاء الحظر':'حظر الحساب'}</button><button class="btn-small" style="background:#b45309" data-ws-open="${walletAdminEscape(uid)}"><i class="fas fa-store"></i> أسعار تاجر</button></div>
+                    <div class="btn-group"><button class="btn-small btn-green" onclick="adjustWalletUser('${uid}',1)">إضافة رصيد</button><button class="btn-small btn-red" onclick="adjustWalletUser('${uid}',-1)">خصم رصيد</button><button class="btn-small ${u.banned?'btn-green':'btn-red'}" onclick="setWalletUserBan('${uid}',${u.banned?'false':'true'})">${u.banned?'إلغاء الحظر':'حظر الحساب'}</button><button class="btn-small" style="background:#b45309" data-ws-open="${walletAdminEscape(uid)}"><i class="fas fa-store"></i> أسعار تاجر</button><button class="btn-small" style="background:#6d28d9" onclick="adminSetUserSecurityCode('${uid}')"><i class="fas fa-key"></i> رمز أمان جديد</button></div>
                   </div>`;
             }).join('');
+        }
+        /* تعيين رمز أمان جديد لمستخدم نسيه (بنفس طريقة تشفير الموقع) */
+        async function adminSecurityHash(code,salt,iterations){
+            if(!window.crypto||!crypto.subtle)throw new Error('المتصفح لا يدعم التشفير المطلوب.');
+            const enc=new TextEncoder();
+            const key=await crypto.subtle.importKey('raw',enc.encode(code),'PBKDF2',false,['deriveBits']);
+            const bits=await crypto.subtle.deriveBits({name:'PBKDF2',salt:Uint8Array.from(atob(salt),c=>c.charCodeAt(0)),iterations:iterations,hash:'SHA-256'},key,256);
+            return btoa(String.fromCharCode.apply(null,new Uint8Array(bits)));
+        }
+        async function adminSetUserSecurityCode(uid){
+            if(!isAdminReady())return alert('يجب تسجيل الدخول بحساب الإدارة أولاً.');
+            const u=walletUsersAdminCache[uid]||{};
+            const who=u.username?'@'+u.username:(u.email||uid);
+            const code=prompt('اكتب رمز الأمان الجديد للمستخدم '+who+'\n(من 6 إلى 12 حرفًا أو رقمًا بالإنجليزية فقط)');
+            if(code===null)return;
+            if(!/^[A-Za-z0-9]{6,12}$/.test(code))return alert('الرمز غير صالح. استخدم من 6 إلى 12 حرفًا أو رقمًا بالإنجليزية فقط.');
+            if(!confirm('تأكيد تعيين رمز أمان جديد للمستخدم '+who+'؟\nسيستبدل الرمز القديم فورًا، وسيحتاج المستخدم هذا الرمز عند الدخول.'))return;
+            try{
+                const bytes=crypto.getRandomValues(new Uint8Array(16));
+                const salt=btoa(String.fromCharCode.apply(null,bytes)),iterations=120000;
+                const hash=await adminSecurityHash(code,salt,iterations);
+                const old=(u.securityCode&&typeof u.securityCode==='object')?u.securityCode:{};
+                const TS=firebase.database.ServerValue.TIMESTAMP;
+                await db.ref('wallet_users/'+uid+'/securityCode').set({enabled:true,salt:salt,hash:hash,iterations:iterations,createdAt:old.createdAt||TS,changedAt:TS,updatedAt:TS,resetByAdmin:true});
+                if(walletUsersAdminCache[uid])walletUsersAdminCache[uid].securityCode={enabled:true};
+                renderWalletUsers();
+                alert('تم تعيين رمز الأمان الجديد بنجاح.\nالرمز: '+code+'\nأرسله للمستخدم. بعد دخوله يقدر يغيّره من حسابه بعد مرور 90 يومًا.');
+            }catch(e){alert('تعذر حفظ رمز الأمان: '+(e&&e.message?e.message:e));}
         }
         async function adjustWalletUser(uid,sign){if(!isAdminReady())return alert('يجب تسجيل الدخول أولاً.');const amount=Number(document.getElementById('walletAdjAmt_'+uid).value);const note=document.getElementById('walletAdjNote_'+uid).value.trim();const rate=Number(document.getElementById('walletUsdToEgp').value)||50;if(!Number.isFinite(amount)||amount<=0)return alert('أدخل مبلغًا صحيحًا أكبر من صفر.');const signedUsd=Math.round(amount*sign*10000)/10000;const signedEgp=Math.round(amount*rate*sign*100)/100;const user=walletUsersAdminCache[uid]||{};const currentEgp=Number.isFinite(Number(user.balanceEgp))?Number(user.balanceEgp):Number(user.balanceUsd||0)*rate;if(sign<0&&Math.abs(signedEgp)>currentEgp+0.001)return alert('الرصيد الحالي لا يكفي لهذا الخصم.');if(!confirm(`تأكيد ${sign>0?'إضافة':'خصم'} ${Math.abs(signedEgp).toFixed(2)} جنيه (ما يعادل ${amount.toFixed(2)} دولار بالسعر الحالي) ${sign>0?'إلى':'من'} رصيد ${user.username?'@'+user.username:(user.email||uid)}؟`))return;try{const ref=db.ref('wallet_users/'+uid);const tx=await ref.transaction(cur=>{cur=cur&&typeof cur==='object'?cur:{};const balEgp=Number.isFinite(Number(cur.balanceEgp))?Number(cur.balanceEgp):Number(cur.balanceUsd||0)*rate;if(!Number.isFinite(balEgp)||balEgp+signedEgp< -0.001)return;cur.balanceEgp=Math.round((balEgp+signedEgp)*100)/100;cur.balanceUsd=Math.round((cur.balanceEgp/rate)*10000)/10000;cur.updatedAt=Date.now();return cur;});if(!tx.committed)throw new Error('لم يتم تحديث الرصيد؛ قد يكون الرصيد تغير أو لا يكفي.');const logKey=db.ref('wallet_admin_adjustments').push().key;await db.ref('wallet_admin_adjustments/'+logKey).set({uid,email:user.email||'',amount:signedUsd,amountEgp:signedEgp,reason:note,admin:auth.currentUser.email||'',createdAt:firebase.database.ServerValue.TIMESTAMP});await refreshWalletUsers();alert('تم تحديث الرصيد بنجاح.');}catch(e){alert('تعذر تعديل الرصيد: '+dbErrorMessage(e));}}
 
