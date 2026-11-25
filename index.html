@@ -3874,7 +3874,11 @@ var cat={},api={},provider=[],fxRate=50,sel={},ordersData=[],ordLive={},provShow
 
 var PRESETS={tiktok:['تيك توك','#fe2c55',1],facebook:['فيسبوك','#1877f2',2],instagram:['إنستجرام','#e1306c',3],youtube:['يوتيوب','#ff0033',4],telegram:['تيليجرام','#229ed9',5],twitter:['تويتر / X','#1d9bf0',6],snapchat:['سناب شات','#f7d90a',7],spotify:['سبوتيفاي','#1db954',8],whatsapp:['واتساب','#25d366',9],other:['منصات أخرى','#8b5cf6',99]};
 var GUESS=[['tiktok',/tik\s*-?tok|تيك/i],['instagram',/insta|انستا|إنستا|\big\b/i],['facebook',/face\s*book|فيس|\bfb\b/i],['youtube',/you\s*tube|يوتيوب|\byt\b/i],['telegram',/telegram|تيليجرام|تلجرام|\btg\b/i],['twitter',/twitter|تويتر|\bx\s*(\(|-|\/)|x\.com/i],['snapchat',/snap\s*chat|سناب/i],['spotify',/spotify|سبوتيفاي/i],['whatsapp',/whats\s*app|واتس/i]];
-function guess(s){var t=(s.category||'')+' '+(s.name||'');for(var i=0;i<GUESS.length;i++)if(GUESS[i][1].test(t))return GUESS[i][0];return 'other';}
+function platKws(k,x){var kw=String((x&&x.keywords)||'').trim();if(!kw){if(PRESETS[k])return [];kw=String((x&&x.name)||'');}return kw.split(/[,،\n]+/).map(function(w){return w.trim().toLowerCase();}).filter(function(w){return w.length>1;});}
+function pname(k){return PRESETS[k]?PRESETS[k][0]:(((cat.platforms||{})[k]||{}).name||k);}
+function guess(s){var t=((s.category||'')+' '+(s.name||'')).toLowerCase(),P=cat.platforms||{},ks=Object.keys(P),i,j,w;
+  for(i=0;i<ks.length;i++){w=platKws(ks[i],P[ks[i]]);for(j=0;j<w.length;j++)if(t.indexOf(w[j])>-1)return ks[i];}
+  for(i=0;i<GUESS.length;i++)if(GUESS[i][1].test(t))return GUESS[i][0];return 'other';}
 function ok(){return typeof isAdminReady==='function'&&isAdminReady();}
 function dbErr(e){return typeof dbErrorMessage==='function'?dbErrorMessage(e):(e&&e.message)||'خطأ';}
 function money(n){return (Math.round(Number(n)*100)/100).toFixed(2);}
@@ -3897,7 +3901,8 @@ tab.innerHTML='<style>#tab-smm .sm-row{display:flex;gap:8px;flex-wrap:wrap;align
  '<div id="smmAdStatus" style="margin-top:12px;font-size:.88rem;line-height:1.8;overflow-wrap:anywhere"></div></div>'+
 '<div class="form-section" style="border-top:4px solid #8b5cf6"><h3><i class="fas fa-share-nodes" style="color:#8b5cf6"></i> المنصات واللوجوهات</h3>'+
  '<div class="sm-row" id="smmAdPresets" style="margin-bottom:10px"></div>'+
- '<div class="sm-row"><div class="form-group"><label>اسم المنصة:</label><input type="text" id="smmPlName" placeholder="تيك توك"></div><div class="form-group"><label>معرّف إنجليزي:</label><input type="text" id="smmPlKey" dir="ltr" placeholder="tiktok"></div></div>'+
+ '<div class="sm-row"><div class="form-group"><label>اسم المنصة (اكتبه كما هو عند المزود):</label><input type="text" id="smmPlName" list="smmProvCats" placeholder="تيك توك"><datalist id="smmProvCats"></datalist></div><div class="form-group"><label>معرّف إنجليزي (اختياري — يتولد تلقائياً):</label><input type="text" id="smmPlKey" dir="ltr" placeholder="tiktok"></div></div>'+
+ '<div class="form-group"><label>كلمات التعرّف عند المزود (اختياري — افصل بفاصلة، وإن تُركت يُستخدم اسم المنصة):</label><input type="text" id="smmPlKw" placeholder="مثال: Threads, ثريدز"><div class="sm-sub" style="margin-top:4px">أي خدمة عند المزود اسمها أو قسمها يحتوي إحدى هذه الكلمات تُنسب لهذه المنصة تلقائياً، وبعدها اضغط «جلب خدماتها وأسعارها» في كارت المنصة.</div></div>'+
  '<div class="sm-row"><div class="form-group"><label>لون المنصة:</label><input type="color" id="smmPlColor" value="#06b6d4"></div><div class="form-group"><label>الترتيب:</label><input type="number" id="smmPlOrder" value="1"></div></div>'+
  '<div class="form-group"><label>وصف قصير (اختياري):</label><input type="text" id="smmPlDesc" placeholder="متابعين ولايكات ومشاهدات حقيقية"></div>'+
  '<div class="form-group"><label>اللوجو — يدعم الصور المتحركة GIF / WebP / APNG / SVG (رابط أو من المعرض):</label><input type="url" id="smmPlIcon" dir="ltr" placeholder="https://... (يدعم أيضاً mp4 / webm كرابط)"><input type="file" id="smmPlFile" accept="image/*" style="margin-top:8px"><div class="sm-sub" style="margin-top:4px">الصور المتحركة المرفوعة من الجهاز حتى 700KB، وللأكبر استخدم رابط.</div><div style="display:flex;gap:10px;align-items:center;margin-top:8px"><img id="smmPlPrev" alt="" class="sm-ic" style="display:none"><button type="button" class="btn-small" style="background:#64748b;display:none" id="smmPlClr" data-act="clearIcon">إزالة اللوجو</button></div></div>'+
@@ -3974,19 +3979,20 @@ function readIcon(file){
 async function savePlat(){
   if(!ok())return alert('يجب تسجيل الدخول بحساب الإدارة.');
   var name=String($('smmPlName').value||'').trim(),key=String($('smmPlKey').value||'').trim().toLowerCase().replace(/[^a-z0-9_-]/g,'');
-  if(!name||!key)return alert('اكتب اسم المنصة والمعرّف الإنجليزي.');
+  if(!name)return alert('اكتب اسم المنصة.');
+  if(!key){key=name.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,24);if(!key||(cat.platforms||{})[key]||PRESETS[key])key='c'+Date.now().toString(36);}
   var old=(cat.platforms||{})[key]||{};
-  var data={name:name.slice(0,40),icon:String($('smmPlIcon').value||'').trim(),color:$('smmPlColor').value||'#06b6d4',desc:String($('smmPlDesc').value||'').trim().slice(0,120),order:Number($('smmPlOrder').value)||1,enabled:old.enabled!==false};
-  try{await db.ref('settings/smmCatalog/platforms/'+key).set(data);['smmPlName','smmPlKey','smmPlIcon','smmPlDesc'].forEach(function(i){$(i).value='';});$('smmPlFile').value='';setIconPrev('');alert('تم حفظ المنصة.');}catch(e){alert('تعذر الحفظ: '+dbErr(e));}
+  var data={name:name.slice(0,40),icon:String($('smmPlIcon').value||'').trim(),color:$('smmPlColor').value||'#06b6d4',desc:String($('smmPlDesc').value||'').trim().slice(0,120),order:Number($('smmPlOrder').value)||1,enabled:old.enabled!==false,keywords:String(($('smmPlKw')||{}).value||'').trim().slice(0,200)};
+  try{await db.ref('settings/smmCatalog/platforms/'+key).set(data);['smmPlName','smmPlKey','smmPlIcon','smmPlDesc','smmPlKw'].forEach(function(i){if($(i))$(i).value='';});$('smmPlFile').value='';setIconPrev('');alert('تم حفظ المنصة. اضغط «جلب خدماتها وأسعارها» في كارتها ليتعرف عليها المزود ويجلب الأسعار تلقائياً.');}catch(e){alert('تعذر الحفظ: '+dbErr(e));}
 }
 function renderPlatforms(){
   var box=$('smmAdPlatforms');if(!box)return;var p=cat.platforms||{},keys=Object.keys(p).sort(function(a,b){return (p[a].order||99)-(p[b].order||99);});
   box.innerHTML=keys.length?keys.map(function(k){var x=p[k],ic=x.icon&&/^(https?:|data:image\/)/i.test(x.icon)&&!/\.(mp4|webm)(\?|$)/i.test(x.icon)?x.icon:'';
     var n=Object.keys(cat.services||{}).filter(function(s){return cat.services[s].platform===k;}).length;
-    return '<div class="sm-card" style="border-inline-start:5px solid '+esc(x.color||'#8b5cf6')+'"><div style="display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap"><div style="display:flex;align-items:center;gap:10px;min-width:0">'+(ic?'<img class="sm-ic" src="'+esc(ic)+'" alt="">':'<span class="sm-ic" style="display:grid;place-items:center;font-size:22px;color:'+esc(x.color||'#8b5cf6')+'"><i class="fas fa-share-nodes"></i></span>')+'<div><strong>'+esc(x.name)+'</strong><div class="sm-sub" dir="ltr">'+esc(k)+' · ترتيب '+esc(x.order||'')+' · '+n+' خدمة'+(x.enabled===false?' · <span style="color:#dc2626">مخفية</span>':'')+'</div></div></div><div style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn-small" style="background:#0284c7;padding:7px 11px" data-act="editPlat" data-k="'+esc(k)+'">تعديل</button><button class="btn-small" style="background:#f59e0b;padding:7px 11px" data-act="togPlat" data-k="'+esc(k)+'">'+(x.enabled===false?'إظهار':'إخفاء')+'</button><button class="btn-small" style="background:#dc2626;padding:7px 11px" data-act="delPlat" data-k="'+esc(k)+'">حذف</button></div></div></div>';}).join(''):'<div class="request-empty">لا توجد منصات. أضف أول منصة من الأعلى.</div>';
+    return '<div class="sm-card" style="border-inline-start:5px solid '+esc(x.color||'#8b5cf6')+'"><div style="display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap"><div style="display:flex;align-items:center;gap:10px;min-width:0">'+(ic?'<img class="sm-ic" src="'+esc(ic)+'" alt="">':'<span class="sm-ic" style="display:grid;place-items:center;font-size:22px;color:'+esc(x.color||'#8b5cf6')+'"><i class="fas fa-share-nodes"></i></span>')+'<div><strong>'+esc(x.name)+'</strong><div class="sm-sub" dir="ltr">'+esc(k)+' · ترتيب '+esc(x.order||'')+' · '+n+' خدمة'+(x.enabled===false?' · <span style="color:#dc2626">مخفية</span>':'')+'</div></div></div><div style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn-small" style="background:#8b5cf6;padding:7px 11px" data-act="platSync" data-k="'+esc(k)+'">جلب خدماتها وأسعارها</button><button class="btn-small" style="background:#10b981;padding:7px 11px" data-act="platPrice" data-k="'+esc(k)+'">تحديث الأسعار</button><button class="btn-small" style="background:#0284c7;padding:7px 11px" data-act="editPlat" data-k="'+esc(k)+'">تعديل</button><button class="btn-small" style="background:#f59e0b;padding:7px 11px" data-act="togPlat" data-k="'+esc(k)+'">'+(x.enabled===false?'إظهار':'إخفاء')+'</button><button class="btn-small" style="background:#dc2626;padding:7px 11px" data-act="delPlat" data-k="'+esc(k)+'">حذف</button></div></div></div>';}).join(''):'<div class="request-empty">لا توجد منصات. أضف أول منصة من الأعلى.</div>';
   ['smmStPlat','smmBulkPlat','smmAddPlat'].forEach(function(id){var e=$(id);if(!e)return;var v=e.value;platOptions(e,id==='smmStPlat'?'كل المنصات':(id==='smmAddPlat'?'المنصة: تحديد تلقائي من الاسم':'اختر منصة'),v);});
   var sp=$('smmSfPlatform');if(sp)platOptions(sp,'— اختر المنصة —',sp.value);
-  var g=$('smmAdGuess');if(g){var gv=g.value;g.innerHTML='<option value="">كل المنصات</option>'+Object.keys(PRESETS).map(function(k){return '<option value="'+k+'">'+esc(PRESETS[k][0])+'</option>';}).join('');g.value=gv;}
+  var g=$('smmAdGuess');if(g){var gv=g.value;g.innerHTML='<option value="">كل المنصات</option>'+Object.keys(PRESETS).concat(Object.keys(cat.platforms||{}).filter(function(k){return !PRESETS[k];})).map(function(k){return '<option value="'+esc(k)+'">'+esc(pname(k))+'</option>';}).join('');g.value=gv;}
 }
 function ensurePlatform(key,updates){
   if((cat.platforms||{})[key]||(updates['platforms/'+key]))return;
@@ -4050,6 +4056,7 @@ async function fetchProv(){
   var box=$('smmAdProvider');box.innerHTML='<div class="request-empty">جاري جلب الخدمات…</div>';
   try{var d=await call({action:'smm_services'});provider=d.services||[];provShown=60;
     var cats={};provider.forEach(function(s){cats[s.category]=1;});var cs=$('smmAdCat'),v=cs.value;cs.innerHTML='<option value="">كل الأقسام ('+Object.keys(cats).length+')</option>'+Object.keys(cats).sort().map(function(c){return '<option>'+esc(c)+'</option>';}).join('');cs.value=v;
+    var dl=$('smmProvCats');if(dl)dl.innerHTML=Object.keys(cats).sort().map(function(c){return '<option value="'+esc(c)+'">';}).join('');
     renderProvider();renderServices();}
   catch(e){box.innerHTML='<div class="request-empty" style="color:#dc2626">تعذر الجلب: '+esc(e.message)+'</div>';}
 }
@@ -4065,14 +4072,14 @@ function renderProvider(){
   var cnt=Object.keys(provSel).filter(function(k){return provSel[k];}).length;if($('smmSelCount'))$('smmSelCount').textContent=cnt+' محدد';
   box.innerHTML='<div class="sm-sub" style="margin-bottom:8px">'+list.length+' خدمة'+(list.length>provShown?' (يعرض أول '+provShown+')':'')+'</div>'+list.slice(0,provShown).map(function(s){
     var c=Number(s.rate)||0,g=guess(s);
-    return '<div class="sm-card'+(s._added?' added':'')+'"><div style="display:flex;gap:10px;align-items:flex-start"><input type="checkbox" data-pv="'+esc(s.service)+'" '+(provSel[s.service]?'checked':'')+' '+(s._added?'disabled':'')+' style="margin-top:6px;flex:0 0 20px;width:20px;height:20px"><div style="min-width:0;flex:1"><strong style="line-height:1.7">'+esc(s.name)+'</strong> '+(s._added?'<span class="sm-chip g">✓ مضافة</span>':'')+'<div class="sm-sub">#'+esc(s.service)+' · '+esc(s.category)+' · '+esc(s.type)+' · <span class="sm-chip">'+esc(PRESETS[g][0])+'</span><br>سعر المزود/1000: <b>'+esc(s.rate)+' $</b> ≈ '+money(c*fxRate)+' جنيه · من '+esc(s.min)+' إلى '+esc(s.max)+(s.refill?' · <span class="sm-chip b">تعويض</span>':'')+(s.cancel?' <span class="sm-chip b">إلغاء</span>':'')+'</div></div></div><div style="margin-top:6px"><button class="btn-small" style="background:'+(s._added?'#64748b':'#10b981')+';padding:7px 12px" data-act="pvOne" data-k="'+esc(s.service)+'">'+(s._added?'مضافة — تعديل':'<i class="fas fa-plus"></i> إضافة وتعديل')+'</button></div></div>';}).join('')+(list.length>provShown?'<button class="btn-small" style="background:#0284c7;width:100%" data-act="pvMore">عرض المزيد</button>':'');
+    return '<div class="sm-card'+(s._added?' added':'')+'"><div style="display:flex;gap:10px;align-items:flex-start"><input type="checkbox" data-pv="'+esc(s.service)+'" '+(provSel[s.service]?'checked':'')+' '+(s._added?'disabled':'')+' style="margin-top:6px;flex:0 0 20px;width:20px;height:20px"><div style="min-width:0;flex:1"><strong style="line-height:1.7">'+esc(s.name)+'</strong> '+(s._added?'<span class="sm-chip g">✓ مضافة</span>':'')+'<div class="sm-sub">#'+esc(s.service)+' · '+esc(s.category)+' · '+esc(s.type)+' · <span class="sm-chip">'+esc(pname(g))+'</span><br>سعر المزود/1000: <b>'+esc(s.rate)+' $</b> ≈ '+money(c*fxRate)+' جنيه · من '+esc(s.min)+' إلى '+esc(s.max)+(s.refill?' · <span class="sm-chip b">تعويض</span>':'')+(s.cancel?' <span class="sm-chip b">إلغاء</span>':'')+'</div></div></div><div style="margin-top:6px"><button class="btn-small" style="background:'+(s._added?'#64748b':'#10b981')+';padding:7px 12px" data-act="pvOne" data-k="'+esc(s.service)+'">'+(s._added?'مضافة — تعديل':'<i class="fas fa-plus"></i> إضافة وتعديل')+'</button></div></div>';}).join('')+(list.length>provShown?'<button class="btn-small" style="background:#0284c7;width:100%" data-act="pvMore">عرض المزيد</button>':'');
 }
 function pvOne(id){
   var s=provider.find(function(p){return String(p.service)===String(id);});if(!s)return;
   var key='s'+String(id).replace(/[^A-Za-z0-9_-]/g,''),ex=(cat.services||{})[key];if(ex)return editSvc(key);
   var cost=Number(s.rate)||0,g=guess(s),pl=(cat.platforms||{})[g]?g:'';
   openServiceForm({isNew:true,providerServiceId:s.service,type:s.type,platform:pl,name:s.name,price:Math.ceil(cost*fxRate*1.3*100)/100,min:Number(s.min),max:Number(s.max),refill:!!s.refill,cancel:!!s.cancel,enabled:true,order:1,cost:cost});
-  if(!pl){alert('المنصة المقترحة «'+PRESETS[g][0]+'» غير مضافة بعد. أضفها من قسم المنصات أو اختر منصة موجودة.');}
+  if(!pl){alert('المنصة المقترحة «'+pname(g)+'» غير مضافة بعد. أضفها من قسم المنصات أو اختر منصة موجودة.');}
 }
 async function bulkAdd(){
   if(!ok())return alert('يجب تسجيل الدخول بحساب الإدارة.');
@@ -4160,7 +4167,7 @@ var ACT={
   saveApi:saveApi,test:testConn,savePlat:savePlat,fetch:fetchProv,saveSvc:saveSvc,ordLoad:ordLoad,ordLive:ordLiveRefresh,bulkAdd:bulkAdd,
   clearIcon:function(){$('smmPlIcon').value='';$('smmPlFile').value='';setIconPrev('');},
   preset:function(b){var k=b.dataset.k,P=PRESETS[k];$('smmPlKey').value=k;$('smmPlName').value=P[0];$('smmPlColor').value=P[1];$('smmPlOrder').value=P[2];},
-  editPlat:function(b){var k=b.dataset.k,x=(cat.platforms||{})[k];if(!x)return;$('smmPlName').value=x.name||'';$('smmPlKey').value=k;$('smmPlOrder').value=x.order||1;$('smmPlColor').value=x.color||'#06b6d4';$('smmPlDesc').value=x.desc||'';$('smmPlIcon').value=x.icon||'';setIconPrev(x.icon||'');$('smmPlName').scrollIntoView({behavior:'smooth',block:'center'});},
+  editPlat:function(b){var k=b.dataset.k,x=(cat.platforms||{})[k];if(!x)return;$('smmPlName').value=x.name||'';$('smmPlKey').value=k;$('smmPlOrder').value=x.order||1;$('smmPlColor').value=x.color||'#06b6d4';$('smmPlDesc').value=x.desc||'';if($('smmPlKw'))$('smmPlKw').value=x.keywords||'';$('smmPlIcon').value=x.icon||'';setIconPrev(x.icon||'');$('smmPlName').scrollIntoView({behavior:'smooth',block:'center'});},
   togPlat:async function(b){if(!ok())return;var x=(cat.platforms||{})[b.dataset.k];if(!x)return;try{await db.ref('settings/smmCatalog/platforms/'+b.dataset.k+'/enabled').set(x.enabled===false);}catch(e){alert(dbErr(e));}},
   delPlat:async function(b){if(!ok())return;var k=b.dataset.k,n=Object.keys(cat.services||{}).filter(function(s){return cat.services[s].platform===k;}).length;if(!confirm('حذف هذه المنصة؟'+(n?'\nيوجد '+n+' خدمة مرتبطة بها وستختفي من الموقع.':'')))return;try{await db.ref('settings/smmCatalog/platforms/'+k).remove();}catch(e){alert(dbErr(e));}},
   editSvc:function(b){editSvc(b.dataset.k);},
@@ -4170,6 +4177,35 @@ var ACT={
   calcMargin:function(){var c=Number($('smmSfCost').value),m=Number($('smmSfMargin').value);if(!(c>0))return alert('لا توجد تكلفة محفوظة. اضغط «جلب الخدمات من المزود» أولاً.');$('smmSfPrice').value=Math.ceil(c*fxRate*(1+m/100)*100)/100;calcProfit();},
   stAll:function(){var ks=Object.keys(cat.services||{});var all=ks.every(function(k){return sel[k];});ks.forEach(function(k){sel[k]=!all;});renderServices();},
   bulkMove:function(){bulk('move');},bulkMargin:function(){bulk('margin');},bulkOn:function(){bulk('on');},bulkOff:function(){bulk('off');},bulkDel:function(){bulk('del');},
+  platSync:async function(b){
+    if(!ok())return alert('يجب تسجيل الدخول بحساب الإدارة.');
+    var k=b.dataset.k,x=(cat.platforms||{})[k];if(!x)return;
+    if(!provider.length){await fetchProv();}
+    if(!provider.length)return alert('تعذر جلب خدمات المزود. تأكد من رابط الـ Worker وحفظه.');
+    var m=Number(($('smmAddMargin')||{}).value);if(!(m>=0))m=30;
+    var added={};Object.keys(cat.services||{}).forEach(function(q){added[String(cat.services[q].providerServiceId)]=1;});
+    var list=provider.filter(function(sv){return guess(sv)===k&&!added[String(sv.service)];});
+    if(!list.length)return alert('لا توجد خدمات جديدة عند المزود تطابق «'+(x.name||k)+'». جرّب تعديل «كلمات التعرّف» في المنصة.');
+    if(!confirm('تم العثور على '+list.length+' خدمة عند المزود للمنصة «'+(x.name||k)+'».\nإضافتها للمتجر بأسعار المزود + ربح '+m+'% (من خانة نسبة الربح في قسم خدمات المزود)؟'))return;
+    var u={},order=Object.keys(cat.services||{}).length;
+    list.forEach(function(sv){var key='s'+String(sv.service).replace(/[^A-Za-z0-9_-]/g,'');if((cat.services||{})[key])return;var cost=Number(sv.rate)||0;
+      u['services/'+key]={providerServiceId:String(sv.service),platform:k,name:String(sv.name).slice(0,120),desc:'',pricePer1000Egp:Math.ceil(cost*fxRate*(1+m/100)*100)/100,costUsdPer1000:cost>0?cost:null,min:Number(sv.min),max:Number(sv.max),type:sv.type||'Default',badge:'',speed:'',guarantee:'',quickQty:'',refill:!!sv.refill,cancel:!!sv.cancel,enabled:true,order:++order,updatedAt:firebase.database.ServerValue.TIMESTAMP};});
+    try{await db.ref('settings/smmCatalog').update(u);alert('تمت إضافة '+Object.keys(u).length+' خدمة ✅ بأسعارها من المزود.');}catch(e){alert('تعذر الإضافة: '+dbErr(e));}
+  },
+  platPrice:async function(b){
+    if(!ok())return alert('يجب تسجيل الدخول بحساب الإدارة.');
+    var k=b.dataset.k,x=(cat.platforms||{})[k];if(!x)return;
+    if(!provider.length){await fetchProv();}
+    if(!provider.length)return alert('تعذر جلب خدمات المزود. تأكد من رابط الـ Worker وحفظه.');
+    var m=Number(($('smmAddMargin')||{}).value);if(!(m>=0))m=30;
+    var ks=Object.keys(cat.services||{}).filter(function(q){return cat.services[q].platform===k;});
+    var u={},n=0;
+    ks.forEach(function(q){var pv=provider.find(function(p){return String(p.service)===String(cat.services[q].providerServiceId);});if(!pv)return;var cost=Number(pv.rate)||0;if(!(cost>0))return;
+      u['services/'+q+'/pricePer1000Egp']=Math.ceil(cost*fxRate*(1+m/100)*100)/100;u['services/'+q+'/costUsdPer1000']=cost;u['services/'+q+'/updatedAt']=firebase.database.ServerValue.TIMESTAMP;n++;});
+    if(!n)return alert('لا توجد خدمات في هذه المنصة مربوطة بالمزود لتحديث أسعارها.');
+    if(!confirm('تحديث أسعار '+n+' خدمة في «'+(x.name||k)+'» حسب سعر المزود الحالي + ربح '+m+'%؟\nسيتم استبدال الأسعار التي عدّلتها يدوياً لهذه الخدمات.'))return;
+    try{await db.ref('settings/smmCatalog').update(u);alert('تم تحديث أسعار '+n+' خدمة ✅');}catch(e){alert('تعذر التحديث: '+dbErr(e));}
+  },
   pvOne:function(b){pvOne(b.dataset.k);},
   pvMore:function(){provShown+=60;renderProvider();},
   pvAll:function(){provFiltered().slice(0,provShown).forEach(function(s){if(!s._added)provSel[s.service]=true;});renderProvider();},
